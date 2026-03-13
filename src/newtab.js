@@ -435,6 +435,45 @@ $('btnSettings').addEventListener('click', function(){
 });
 
 /* ═══════════════════════════════════════════
+   THEME TOGGLE
+════════════════════════════════════════════ */
+function applyStoredTheme() {
+  if (!window.chrome || !chrome.storage) return;
+  chrome.storage.local.get(['settings'], function(data) {
+    var theme = data.settings?.pageTheme || 'dark';
+    setTheme(theme);
+  });
+}
+
+function setTheme(theme) {
+  var r = document.documentElement;
+  document.querySelectorAll('.theme-btn').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.theme === theme);
+  });
+  if (theme === 'light') {
+    r.classList.add('light');
+  } else {
+    r.classList.remove('light');
+  }
+}
+
+document.querySelectorAll('.theme-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var theme = btn.dataset.theme;
+    setTheme(theme);
+    if (window.chrome && chrome.storage) {
+      chrome.storage.local.get(['settings'], function(data) {
+        var settings = data.settings || {};
+        settings.pageTheme = theme;
+        chrome.storage.local.set({ settings: settings });
+      });
+    }
+  });
+});
+
+applyStoredTheme();
+
+/* ═══════════════════════════════════════════
    LIVE UPDATES from storage
 ═════════════════════════════════════════════ */
 if (window.chrome && chrome.storage && chrome.storage.onChanged) {

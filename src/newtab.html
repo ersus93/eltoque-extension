@@ -12,14 +12,26 @@
   --bg4:     #191935;
   --border:  rgba(255,255,255,0.07);
   --text:    #e4e4f4;
-  --text2:   #6868a0;
-  --text3:   #2e2e58;
+  --text2:   #9898c0;
+  --text3:   #5a5a80;
   --accent:  #4f7cff;
   --up:      #ef4444;
   --dn:      #22c55e;
   --binance: #f3ba2f;
   --mono:    'JetBrains Mono','Courier New',monospace;
   --r:       10px;
+}
+
+/* Tema claro */
+:root.light {
+  --bg:      #f5f5fa;
+  --bg2:     #ffffff;
+  --bg3:     #eaeaf5;
+  --bg4:     #dedee8;
+  --border:  rgba(0,0,0,0.08);
+  --text:    #1a1a2e;
+  --text2:   #4a4a6a;
+  --text3:   #8a8aa8;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{width:100%;height:100%;overflow-x:hidden}
@@ -73,7 +85,7 @@ body::before{
   position:relative;z-index:1;
   flex:1;display:flex;flex-direction:column;align-items:center;
   width:100%;max-width:1120px;margin:0 auto;
-  padding:24px 28px 36px;gap:22px;
+  padding:24px 28px 36px;gap:36px;
 }
 #hdr{
   display:flex;align-items:flex-end;justify-content:space-between;
@@ -85,6 +97,16 @@ body::before{
 }
 #dateStr{font-size:12px;color:var(--text2);margin-top:4px;letter-spacing:.04em}
 #hdrRight{display:flex;gap:8px;align-items:center}
+.theme-toggle{
+  display:flex;gap:2px;background:var(--bg3);border-radius:6px;padding:2px;
+  border:1px solid var(--border);
+}
+.theme-btn{
+  padding:4px 10px;font-size:11px;border:none;background:transparent;color:var(--text2);
+  cursor:pointer;border-radius:4px;transition:all .15s;
+}
+.theme-btn:hover{color:var(--text)}
+.theme-btn.active{background:var(--accent);color:#fff;font-weight:600}
 .hbtn{
   font-size:11px;color:var(--text2);padding:5px 12px;
   border:1px solid var(--border);border-radius:6px;
@@ -159,7 +181,7 @@ body::before{
   display:flex;align-items:center;justify-content:space-between;
   margin-top:7px;padding-top:6px;border-top:1px solid var(--border);
 }
-.rcard-name{font-size:9px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:58%}
+.rcard-name{font-size:10px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:58%}
 .rcard-pct{font-family:var(--mono);font-size:9px;font-weight:600;flex-shrink:0}
 .rcard.up .rcard-pct{color:var(--up)}
 .rcard.dn .rcard-pct{color:var(--dn)}
@@ -237,7 +259,7 @@ body::before{
 }
 #mticks{display:flex;justify-content:space-between;margin-bottom:10px}
 .mtick{
-  font-size:8px;color:var(--text3);text-transform:uppercase;
+  font-size:9px;color:var(--text3);text-transform:uppercase;
   letter-spacing:.04em;text-align:center;flex:1;
 }
 .mtick.past{color:var(--text2)}
@@ -252,7 +274,7 @@ body::before{
   font-family:var(--mono);font-size:17px;font-weight:700;
   color:var(--text);letter-spacing:-.02em;
 }
-.ystat-l{font-size:9px;color:var(--text3);margin-top:2px;letter-spacing:.06em;text-transform:uppercase}
+.ystat-l{font-size:10px;color:var(--text3);margin-top:3px;letter-spacing:.06em;text-transform:uppercase}
 #foot{
   display:flex;align-items:center;gap:12px;
   padding:10px 0 4px;font-size:10px;color:var(--text3);
@@ -276,6 +298,10 @@ body::before{
       <div id="dateStr">—</div>
     </div>
     <div id="hdrRight">
+      <div class="theme-toggle">
+        <button class="theme-btn active" data-theme="dark" title="Tema oscuro">🌙</button>
+        <button class="theme-btn" data-theme="light" title="Tema claro">☀️</button>
+      </div>
       <button class="hbtn" id="btnRefresh">↻ Actualizar</button>
       <button class="hbtn" id="btnSettings">⚙ Config</button>
     </div>
