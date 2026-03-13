@@ -8,7 +8,7 @@
 
 > Extensión de navegador para consultar las tasas de cambio del mercado informal cubano. Accede rápidamente escribiendo `et` en la barra de direcciones.
 
-BBAlert es una extensión no oficial que muestra en tiempo real las tasas de cambio del mercado informal cubano (TRMI) publicadas por [eltoque.com](https://tasas.eltoque.com). Diseñada para ser rápida, configurable y discreta.
+BBAlert es una extensión no oficial que muestra en tiempo real las tasas de cambio del mercado informal cubano (TRMI) publicadas por [eltoque.com](https://eltoque.com/tasas-de-cambio-cuba). Diseñada para ser rápida, configurable y discreta.
 
 ---
 
