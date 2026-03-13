@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BBAlerts - Tasas ElToque</title>
+<style>
+:root {
+  --bg:      #07071a;
+  --bg2:     #0d0d22;
+  --bg3:     #12122c;
+  --bg4:     #191935;
+  --border:  rgba(255,255,255,0.07);
+  --text:    #e4e4f4;
+  --text2:   #6868a0;
+  --text3:   #2e2e58;
+  --accent:  #4f7cff;
+  --up:      #ef4444;
+  --dn:      #22c55e;
+  --binance: #f3ba2f;
+  --mono:    'JetBrains Mono','Courier New',monospace;
+  --r:       10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow-x:hidden}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:system-ui,-apple-system,sans-serif;
+  font-size:13px;min-height:100vh;
+  display:flex;flex-direction:column;
+}
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 65% 45% at 20% 15%, rgba(79,124,255,0.09) 0%,transparent 65%),
+    radial-gradient(ellipse 50% 35% at 80% 25%, rgba(243,186,47,0.06) 0%,transparent 60%),
+    radial-gradient(ellipse 60% 50% at 50% 95%, rgba(34,197,94,0.04) 0%,transparent 65%);
+}
+#tickerZone{
+  position:relative;z-index:10;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  overflow:hidden;height:34px;flex-shrink:0;
+}
+#tickerZone::before,#tickerZone::after{
+  content:'';position:absolute;top:0;height:100%;width:50px;z-index:2;pointer-events:none;
+}
+#tickerZone::before{left:0;background:linear-gradient(to right,var(--bg2),transparent)}
+#tickerZone::after{right:0;background:linear-gradient(to left,var(--bg2),transparent)}
+#tickerStrip{
+  display:flex;align-items:center;height:100%;
+  width:max-content;white-space:nowrap;
+  animation:tick-scroll linear infinite;
+  animation-duration:var(--td,40s);
+  animation-play-state:running;
+}
+@keyframes tick-scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.ti{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:0 16px;flex-shrink:0;
+  font-family:var(--mono);font-size:11px;font-weight:600;
+}
+.ti .tsrc{font-size:8px;opacity:.4;letter-spacing:.1em;text-transform:uppercase}
+.ti .tcur{font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--text2)}
+.ti .tval{font-weight:700}
+.ti .tunit{font-size:8px;opacity:.4;margin-left:1px}
+.ti .tarr{font-size:8px}
+.ti.up .tval,.ti.up .tarr{color:var(--up)}
+.ti.dn .tval,.ti.dn .tarr{color:var(--dn)}
+.ti.neu .tval,.ti.neu .tarr{color:var(--text2)}
+.ti.bnc .tcur{color:var(--binance)}
+.tsep{color:var(--text3);padding:0 6px;font-size:10px;flex-shrink:0}
+#page{
+  position:relative;z-index:1;
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  width:100%;max-width:1120px;margin:0 auto;
+  padding:24px 28px 36px;gap:22px;
+}
+#hdr{
+  display:flex;align-items:flex-end;justify-content:space-between;
+  width:100%;
+}
+#clock{
+  font-family:var(--mono);font-size:40px;font-weight:300;
+  color:var(--text);letter-spacing:-.04em;line-height:1;
+}
+#dateStr{font-size:12px;color:var(--text2);margin-top:4px;letter-spacing:.04em}
+#hdrRight{display:flex;gap:8px;align-items:center}
+.hbtn{
+  font-size:11px;color:var(--text2);padding:5px 12px;
+  border:1px solid var(--border);border-radius:6px;
+  background:transparent;cursor:pointer;transition:all .15s;
+}
+.hbtn:hover{color:var(--text);border-color:rgba(255,255,255,.15);background:var(--bg3)}
+#panels{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:16px;width:100%;
+}
+@media(max-width:680px){.panel{grid-template-columns:1fr}}
+.panel{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--r);overflow:hidden;
+}
+.pnl-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px 9px;border-bottom:1px solid var(--border);
+  background:var(--bg3);
+}
+.pnl-title{
+  display:flex;align-items:center;gap:7px;
+  font-size:10px;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--text2);
+}
+.pnl-right{display:flex;align-items:center;gap:8px}
+.pnl-upd{font-family:var(--mono);font-size:9px;color:var(--text3)}
+.badge{
+  font-family:var(--mono);font-size:9px;padding:2px 7px;
+  border-radius:4px;font-weight:600;letter-spacing:.08em;
+}
+.badge-et{background:rgba(79,124,255,.15);color:var(--accent);border:1px solid rgba(79,124,255,.25)}
+.badge-bn{background:rgba(243,186,47,.12);color:var(--binance);border:1px solid rgba(243,186,47,.25)}
+.rgrid{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:8px;padding:10px;
+  min-height:120px;
+}
+.rcard{
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:8px;padding:10px 11px 8px;
+  position:relative;overflow:hidden;
+  transition:transform .15s,border-color .2s,box-shadow .2s;cursor:default;
+}
+.rcard:hover{
+  transform:translateY(-2px);border-color:rgba(255,255,255,.12);
+  box-shadow:0 6px 20px rgba(0,0,0,.35);
+}
+.rcard::before{
+  content:'';position:absolute;left:0;top:0;
+  width:2px;height:100%;border-radius:2px 0 0 2px;
+}
+.rcard.up::before{background:var(--up)}
+.rcard.dn::before{background:var(--dn)}
+.rcard.neu::before{background:var(--text3);opacity:.5}
+.rcard-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
+.rcard-sym{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.1em}
+.rcard-ico{font-size:13px;line-height:1}
+.rcard-val{
+  font-family:var(--mono);font-weight:700;line-height:1.1;
+  letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.rcard-val.sz4{font-size:20px}
+.rcard-val.sz5{font-size:17px}
+.rcard-val.sz6{font-size:14px}
+.rcard-val.sz7{font-size:12px}
+.rcard.up .rcard-val{color:var(--up)}
+.rcard.dn .rcard-val{color:var(--dn)}
+.rcard.neu .rcard-val{color:var(--text)}
+.rcard-unit{font-size:8px;color:var(--text3);margin-top:2px;letter-spacing:.04em}
+.rcard-bot{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:7px;padding-top:6px;border-top:1px solid var(--border);
+}
+.rcard-name{font-size:9px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:58%}
+.rcard-pct{font-family:var(--mono);font-size:9px;font-weight:600;flex-shrink:0}
+.rcard.up .rcard-pct{color:var(--up)}
+.rcard.dn .rcard-pct{color:var(--dn)}
+.rcard.neu .rcard-pct{color:var(--text3)}
+.skel{
+  background:linear-gradient(90deg,var(--bg3) 25%,var(--bg4) 50%,var(--bg3) 75%);
+  background-size:200% 100%;animation:shim 1.4s infinite;border-radius:7px;
+}
+@keyframes shim{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.pnl-err{
+  grid-column:span 3;padding:16px;text-align:center;
+  color:var(--text3);font-size:11px;line-height:1.6;
+}
+#searchZone{
+  width:100%;display:flex;flex-direction:column;align-items:center;gap:10px;
+}
+#searchWrap{width:100%;max-width:600px;position:relative}
+#searchInput{
+  width:100%;padding:14px 52px 14px 22px;
+  background:var(--bg2);border:1.5px solid var(--border);
+  border-radius:50px;color:var(--text);
+  font-family:system-ui,sans-serif;font-size:15px;
+  outline:none;transition:border-color .2s,box-shadow .2s;
+}
+#searchInput::placeholder{color:var(--text3)}
+#searchInput:focus{
+  border-color:rgba(255,255,255,.2);
+  box-shadow:0 0 0 3px rgba(79,124,255,.12),0 4px 20px rgba(0,0,0,.3);
+}
+#searchBtn{
+  position:absolute;right:6px;top:50%;transform:translateY(-50%);
+  width:38px;height:38px;border-radius:50%;
+  background:var(--accent);border:none;color:#fff;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:background .15s,transform .1s;
+}
+#searchBtn:hover{background:#3a6de0}
+#searchBtn:active{transform:translateY(-50%) scale(.92)}
+#hints{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.hint{
+  font-size:10px;color:var(--text2);padding:3px 11px;
+  border:1px solid var(--border);border-radius:20px;
+  cursor:pointer;background:transparent;transition:all .15s;
+}
+.hint:hover{background:var(--bg3);color:var(--text);border-color:rgba(255,255,255,.14)}
+#yearWidget{
+  width:100%;max-width:600px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);
+  padding:18px 20px 16px;
+}
+#ywHdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+#ywTitle{
+  display:flex;align-items:center;gap:7px;
+  font-size:10px;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--text2);
+}
+#ywPct{
+  font-family:var(--mono);font-size:22px;font-weight:700;
+  color:var(--text);letter-spacing:-.03em;
+}
+#ywPct small{font-size:13px;font-weight:400;color:var(--text2)}
+.ptrack{
+  width:100%;height:7px;background:var(--bg4);
+  border-radius:4px;overflow:visible;position:relative;margin-bottom:10px;
+}
+.pfill{
+  height:100%;border-radius:4px;
+  background:linear-gradient(to right,var(--accent),#7c3aed);
+  position:relative;transition:width 1.2s ease;
+}
+.pfill::after{
+  content:'';position:absolute;right:-1px;top:50%;transform:translateY(-50%);
+  width:13px;height:13px;background:#fff;border-radius:50%;
+  box-shadow:0 0 8px rgba(79,124,255,.7),0 0 0 2px var(--accent);
+}
+#mticks{display:flex;justify-content:space-between;margin-bottom:10px}
+.mtick{
+  font-size:8px;color:var(--text3);text-transform:uppercase;
+  letter-spacing:.04em;text-align:center;flex:1;
+}
+.mtick.past{color:var(--text2)}
+.mtick.now{color:var(--accent);font-weight:700}
+#ystats{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:0;border-top:1px solid var(--border);padding-top:12px;
+}
+.ystat{text-align:center;padding:0 8px;border-right:1px solid var(--border)}
+.ystat:last-child{border-right:none}
+.ystat-v{
+  font-family:var(--mono);font-size:17px;font-weight:700;
+  color:var(--text);letter-spacing:-.02em;
+}
+.ystat-l{font-size:9px;color:var(--text3);margin-top:2px;letter-spacing:.06em;text-transform:uppercase}
+#foot{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 0 4px;font-size:10px;color:var(--text3);
+  border-top:1px solid var(--border);width:100%;justify-content:center;
+}
+#foot a{color:var(--text3);text-decoration:none;transition:color .15s}
+#foot a:hover{color:var(--text2)}
+.fdot{width:3px;height:3px;background:var(--text3);border-radius:50%}
+</style>
+</head>
+<body>
+<div id="tickerZone">
+  <div id="tickerStrip">
+    <span style="padding:0 20px;color:var(--text3);font-size:10px;font-family:var(--mono)">cargando…</span>
+  </div>
+</div>
+<div id="page">
+  <div id="hdr">
+    <div>
+      <div id="clock">--:--</div>
+      <div id="dateStr">—</div>
+    </div>
+    <div id="hdrRight">
+      <button class="hbtn" id="btnRefresh">↻ Actualizar</button>
+      <button class="hbtn" id="btnSettings">⚙ Config</button>
+    </div>
+  </div>
+  <div id="panels">
+    <div class="panel">
+      <div class="pnl-hdr">
+        <div class="pnl-title">
+          <img src="icons/icon32.png" width="16" height="16" style="object-fit:contain" alt=""> Mercado Informal Cuba
+        </div>
+        <div class="pnl-right">
+          <span class="pnl-upd" id="etUpd">—</span>
+          <span class="badge badge-et">ElToque</span>
+        </div>
+      </div>
+      <div class="rgrid" id="etGrid">
+        <div style="padding:10px 0"><div class="skel" style="height:72px"></div></div>
+        <div style="padding:10px 0"><div class="skel" style="height:72px"></div></div>
+        <div style="padding:10px 0"><div class="skel" style="height:72px"></div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="pnl-hdr">
+        <div class="pnl-title">
+          <svg width="16" height="16" viewBox="0 0 126.6 126.6" fill="none"><path fill="#F3BA2F" d="M38.7 53.2 63.3 28.6l24.6 24.7 14.3-14.4L63.3 0 24.4 38.8zM0 63.3l14.3-14.3 14.3 14.3L14.3 77.6zM38.7 73.4l24.6 24.6 24.6-24.6 14.4 14.3-38.9 38.9-38.9-38.8zM97.9 63.3l14.3-14.3 14.3 14.3-14.3 14.3zM77.6 63.3 63.3 49 49 63.3l14.3 14.3z"/></svg> Binance — Top Cripto
+        </div>
+        <div class="pnl-right">
+          <span class="pnl-upd" id="bnUpd">—</span>
+          <span class="badge badge-bn" id="bnSource">live</span>
+        </div>
+      </div>
+      <div class="rgrid" id="bnGrid">
+        <div style="padding:10px 0"><div class="skel" style="height:72px"></div></div>
+        <div style="padding:10px 0"><div class="skel" style="height:72px"></div></div>
+        <div style="padding:10px 0"><div class="skel" style="height:72px"></div></div>
+      </div>
+    </div>
+  </div>
+  <div id="searchZone">
+    <div id="searchWrap">
+      <input id="searchInput" type="text" placeholder="Buscar en Google…" autocomplete="off" spellcheck="false" autofocus />
+      <button id="searchBtn" title="Buscar">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+      </button>
+    </div>
+    <div id="hints">
+      <button class="hint" data-q="tiempo en la habana">🌤 Tiempo La Habana</button>
+      <button class="hint" data-q="noticias cuba hoy">📰 Noticias Cuba</button>
+      <button class="hint" data-q="tipo de cambio dolar peso cubano">💱 Cambio USD/CUP</button>
+      <button class="hint" data-q="bitcoin precio hoy">₿ Bitcoin hoy</button>
+      <button class="hint" data-q="remesas cuba 2025">💸 Remesas Cuba</button>
+    </div>
+  </div>
+  <div id="yearWidget">
+    <div id="ywHdr">
+      <div id="ywTitle">📅 Progreso del año <span id="ywYear" style="color:var(--accent);margin-left:4px">—</span></div>
+      <div id="ywPct">—<small>%</small></div>
+    </div>
+    <div class="ptrack"><div class="pfill" id="pfill" style="width:0%"></div></div>
+    <div id="mticks"></div>
+    <div id="ystats">
+      <div class="ystat"><div class="ystat-v" id="yDaysPast">—</div><div class="ystat-l">Días transcurridos</div></div>
+      <div class="ystat"><div class="ystat-v" id="yDaysLeft">—</div><div class="ystat-l">Días restantes</div></div>
+      <div class="ystat"><div class="ystat-v" id="yWeeks">—</div><div class="ystat-l">Semanas restantes</div></div>
+    </div>
+  </div>
+  <div id="foot">
+    <a href="https://tasas.eltoque.com" target="_blank">tasas.eltoque.com</a>
+    <div class="fdot"></div>
+    <a href="https://www.binance.com" target="_blank">binance.com</a>
+    <div class="fdot"></div>
+    <span id="footUpd">—</span>
+  </div>
+</div>
+<script src="newtab.js"></script>
+</body>
+</html>

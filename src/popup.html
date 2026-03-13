@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BitBread - Tasas ElToque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-wrap">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <span class="logo-mark">🍞</span>
+        <div class="brand-block">
+          <span class="brand">BBAlert</span>
+          <span class="brand-sep">/</span>
+          <span class="brand-sub">Tasas eltoque</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <span class="update-dot" id="updateDot" title="Estado API"></span>
+        <span class="update-info" id="updateInfo" title="Última actualización">—</span>
+        <button class="icon-btn" id="btnRefresh" title="Actualizar ahora">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+        </button>
+        <button class="icon-btn" id="btnSettings" title="Configuración">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Error Banner -->
+    <div class="error-banner" id="errorBanner" style="display:none">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span id="errorMsg">Error al conectar</span>
+    </div>
+
+    <!-- ① RATES GRID (arriba, principal) -->
+    <div class="rates-section" id="ratesSection">
+      <div class="rates-loading" id="ratesLoading">
+        <div class="spinner"></div>
+        <span>Obteniendo tasas...</span>
+      </div>
+      <div class="rates-grid" id="ratesGrid" style="display:none"></div>
+    </div>
+
+    <!-- ② TICKER BAR (abajo, colapsable) -->
+    <div class="ticker-section" id="tickerSection">
+      <div class="ticker-header" id="tickerToggle" title="Mostrar/ocultar ticker">
+        <span class="ticker-label">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+            <polyline points="17 6 23 6 23 12"/>
+          </svg>
+          ticker
+        </span>
+        <span class="ticker-chevron" id="tickerChevron">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="18 15 12 9 6 15"/>
+          </svg>
+        </span>
+      </div>
+      <div class="ticker-body" id="tickerBody">
+        <div class="ticker-wrapper" id="tickerWrapper">
+          <!-- Un solo div animado que contiene [items][items] duplicados -->
+          <div class="ticker-strip" id="tickerStrip">
+            <!-- contenido se genera en JS -->
+            <span style="padding:0 16px;font-size:9px;color:var(--text3);font-family:var(--mono)">cargando...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span class="footer-source">
+        <span class="footer-dot"></span>
+        BitBread Alert - Tasas eltoque.com (No Oficial)
+      </span>
+      <span class="footer-interval" id="footerInterval">—</span>
+    </footer>
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

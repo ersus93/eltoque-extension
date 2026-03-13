@@ -1,0 +1,59 @@
+# Variables de entorno y archivos de configuración sensibles
+.env
+.env.*
+! .env.example
+
+# Claves de API, certificados y secrets
+*.key
+*.pem
+*.p12
+*.pfx
+*.secrets.json
+*.env.json
+*secret*.json
+*token*.json
+*credential*.json
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Reportes de cobertura
+coverage/
+.lcov*
+
+# Dependencias y paquetes
+node_modules/
+bower_components/
+jspm_packages/
+vendor/
+__pycache__/
+*.pyc
+
+# Builds y distribuciones
+dist/
+build/
+out/
+*.zip
+*.tar.gz
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editor y IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Otros
+.env.local
+.env.development
+.env.staging
+.env.production

@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BBAlerts Tasas — Configuración</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="layout">
+
+    <!-- Sidebar nav -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <span class="logo-mark">₱</span>
+        <div>
+          <div class="brand">eltoque</div>
+          <div class="brand-sub">configuración</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <a class="nav-item active" data-section="api" href="#">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          API y Actualización
+        </a>
+        <a class="nav-item" data-section="display" href="#">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Visualización
+        </a>
+        <a class="nav-item" data-section="colors" href="#">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+          Colores y Tema
+        </a>
+        <a class="nav-item" data-section="currencies" href="#">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          Monedas
+        </a>
+        <a class="nav-item" data-section="overlay" href="#">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18"/></svg>
+          Overlay en Páginas
+        </a>
+        <a class="nav-item" data-section="newtab" href="#">
+          🗂
+          Nueva Pestaña
+        </a>
+        <a class="nav-item" data-section="badge" href="#">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          Badge y Notificaciones
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="btn-ghost" id="btnReset">Restaurar defaults</button>
+        <button class="btn-primary" id="btnSave">Guardar cambios</button>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main">
+
+      <!-- Save toast -->
+      <div class="toast" id="toast">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        Configuración guardada
+      </div>
+
+      <!-- ── SECCIÓN: API ── -->
+      <section class="section active" id="section-api">
+        <div class="section-header">
+          <h2>API y Actualización</h2>
+          <p>Configura la fuente de datos y la frecuencia de consulta</p>
+        </div>
+
+        <div class="fields">
+          <div class="field-group">
+            <label class="label">URL del Endpoint API</label>
+            <input type="url" id="apiUrl" class="input" placeholder="https://tasas.eltoque.com/v1/trmi">
+            <p class="hint">URL principal de la API de ElToque. No modifiques a menos que la API cambie.</p>
+          </div>
+
+          <div class="field-group">
+            <label class="label">API Key (opcional)</label>
+            <input type="password" id="apiKey" class="input" placeholder="Bearer token si la API lo requiere">
+            <p class="hint">Se envía como <code>Authorization: Bearer &lt;key&gt;</code></p>
+          </div>
+
+          <div class="field-group">
+            <label class="label">Intervalo de actualización</label>
+            <div class="range-row">
+              <input type="range" id="updateInterval" min="5" max="240" step="5" class="range">
+              <span class="range-val" id="updateIntervalVal">30 min</span>
+            </div>
+            <div class="range-marks">
+              <span>5 min</span>
+              <span>1 hora</span>
+              <span>4 horas</span>
+            </div>
+            <p class="hint">⚠️ Intervalos cortos pueden saturar la API. Se recomienda mínimo 15 minutos.</p>
+          </div>
+
+          <div class="field-row">
+            <div class="field-group flex-1">
+              <label class="label">Estado de la API</label>
+              <div class="status-row" id="apiStatus">
+                <span class="status-dot"></span>
+                <span class="status-text">Verificando...</span>
+              </div>
+            </div>
+            <div class="field-group">
+              <label class="label">&nbsp;</label>
+              <button class="btn-secondary" id="btnTestApi">Probar conexión</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── SECCIÓN: VISUALIZACIÓN ── -->
+      <section class="section" id="section-display">
+        <div class="section-header">
+          <h2>Visualización</h2>
+          <p>Controla cómo se mueve y presenta el ticker</p>
+        </div>
+
+        <div class="fields">
+          <div class="field-group">
+            <label class="label">Dirección del ticker</label>
+            <div class="btn-group" id="scrollDirectionGroup">
+              <button class="seg-btn active" data-val="horizontal">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                Horizontal ←
+              </button>
+              <button class="seg-btn" data-val="vertical">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+                Vertical ↑
+              </button>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="label">Velocidad de scroll</label>
+            <div class="range-row">
+              <input type="range" id="scrollSpeed" min="10" max="150" step="5" class="range">
+              <span class="range-val" id="scrollSpeedVal">45 px/s</span>
+            </div>
+            <div class="range-marks">
+              <span>Lento</span>
+              <span>Medio</span>
+              <span>Rápido</span>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="label">Tamaño de fuente</label>
+            <div class="range-row">
+              <input type="range" id="fontSize" min="10" max="20" step="1" class="range">
+              <span class="range-val" id="fontSizeVal">13 px</span>
+            </div>
+          </div>
+
+          <div class="toggles">
+            <div class="toggle-row">
+              <div>
+                <span class="toggle-label">Mostrar hora de actualización</span>
+                <span class="toggle-hint">Visible en el header del popup</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="showTimestamp">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <div>
+                <span class="toggle-label">Mostrar banderas de países</span>
+                <span class="toggle-hint">Emoji de bandera junto a la moneda</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="showCurrencyFlag">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-row">
+              <div>
+                <span class="toggle-label">Modo compacto</span>
+                <span class="toggle-hint">Reduce el espaciado para mostrar más monedas</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="compactMode">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── SECCIÓN: COLORES ── -->
+      <section class="section" id="section-colors">
+        <div class="section-header">
+          <h2>Colores y Tema</h2>
+          <p>Personaliza la paleta de colores de la extensión</p>
+        </div>
+
+        <div class="fields">
+          <div class="color-grid">
+            <div class="color-item">
+              <label class="label">Precio sube ▲</label>
+              <div class="color-input-row">
+                <input type="color" id="colorUp" class="color-picker" value="#ef4444">
+                <input type="text" id="colorUpHex" class="input input-sm" placeholder="#ef4444">
+              </div>
+            </div>
+
+            <div class="color-item">
+              <label class="label">Precio baja ▼</label>
+              <div class="color-input-row">
+                <input type="color" id="colorDown" class="color-picker" value="#22c55e">
+                <input type="text" id="colorDownHex" class="input input-sm" placeholder="#22c55e">
+              </div>
+            </div>
+
+            <div class="color-item">
+              <label class="label">Sin cambio —</label>
+              <div class="color-input-row">
+                <input type="color" id="colorNeutral" class="color-picker" value="#a0a0b8">
+                <input type="text" id="colorNeutralHex" class="input input-sm" placeholder="auto">
+              </div>
+              <div class="toggle-row" style="margin-top:6px">
+                <span class="toggle-hint">Usar color del tema</span>
+                <label class="toggle small">
+                  <input type="checkbox" id="neutralAuto" checked>
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="label">Tema de interfaz</label>
+            <div class="btn-group" id="themeGroup">
+              <button class="seg-btn active" data-val="auto">Automático</button>
+              <button class="seg-btn" data-val="dark">Oscuro</button>
+              <button class="seg-btn" data-val="light">Claro</button>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="label">Opacidad del popup</label>
+            <div class="range-row">
+              <input type="range" id="opacity" min="0.6" max="1" step="0.05" class="range">
+              <span class="range-val" id="opacityVal">100%</span>
+            </div>
+          </div>
+
+          <!-- Preview -->
+          <div class="color-preview" id="colorPreview">
+            <div class="preview-label">Vista previa</div>
+            <div class="preview-items">
+              <div class="preview-item up">USD <span>390</span> ▲</div>
+              <div class="preview-item down">EUR <span>415</span> ▼</div>
+              <div class="preview-item neutral">MLC <span>330</span> —</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── SECCIÓN: MONEDAS ── -->
+      <section class="section" id="section-currencies">
+        <div class="section-header">
+          <h2>Monedas</h2>
+          <p>Selecciona qué monedas mostrar y en qué orden</p>
+        </div>
+
+        <div class="fields">
+          <p class="hint" style="margin-bottom:12px">
+            Las monedas disponibles dependen de lo que retorne la API.
+            Arrastra para reordenar. Solo se muestran las activadas.
+          </p>
+
+          <div class="currencies-list" id="currenciesList">
+            <!-- Se genera dinámicamente -->
+            <div class="empty-currencies">Cargando monedas disponibles...</div>
+          </div>
+
+          <div class="field-row" style="margin-top:12px">
+            <button class="btn-secondary" id="btnSelectAll">Seleccionar todas</button>
+            <button class="btn-secondary" id="btnSelectNone">Deseleccionar todas</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── SECCIÓN: OVERLAY ── -->
+      <section class="section" id="section-overlay">
+        <div class="section-header">
+          <h2>Overlay en Páginas Web</h2>
+          <p>Muestra una barra flotante de tasas sobre las páginas que visitas</p>
+        </div>
+
+        <div class="fields">
+          <div class="toggles">
+            <div class="toggle-row">
+              <div>
+                <span class="toggle-label">Activar overlay</span>
+                <span class="toggle-hint">Inyecta el ticker en todas las páginas web</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="overlayEnabled">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="field-group" id="overlayOptions">
+            <label class="label">Posición</label>
+            <div class="btn-group" id="overlayPositionGroup">
+              <button class="seg-btn active" data-val="top">Arriba</button>
+              <button class="seg-btn" data-val="bottom">Abajo</button>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="label">Altura de la barra</label>
+            <div class="range-row">
+              <input type="range" id="overlayHeight" min="20" max="48" step="2" class="range">
+              <span class="range-val" id="overlayHeightVal">28 px</span>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="label">Opacidad del overlay</label>
+            <div class="range-row">
+              <input type="range" id="overlayOpacity" min="0.4" max="1" step="0.05" class="range">
+              <span class="range-val" id="overlayOpacityVal">95%</span>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="label">Z-index (prioridad visual)</label>
+            <input type="number" id="overlayZIndex" class="input" value="999999" min="1" max="2147483647">
+            <p class="hint">Aumenta si el overlay queda tapado por otros elementos de la página</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── SECCIÓN: BADGE ── -->
+      <section class="section" id="section-badge">
+        <div class="section-header">
+          <h2>Badge y Notificaciones</h2>
+          <p>El badge aparece sobre el ícono de la extensión en la barra del navegador</p>
+        </div>
+
+        <div class="fields">
+          <div class="toggles">
+            <div class="toggle-row">
+              <div>
+                <span class="toggle-label">Ícono rotante en toolbar</span>
+                <span class="toggle-hint">Muestra cada moneda rotando en el ícono de la extensión</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="iconRotateEnabled">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <span class="toggle-label">Mostrar badge en el ícono</span>
+                <span class="toggle-hint">Texto pequeño sobre el ícono (fallback si no hay canvas)</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="badgeEnabled">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="label">Velocidad de rotación del ícono</label>
+            <div class="range-row">
+              <input type="range" id="iconRotateInterval" min="1" max="30" step="1" class="range">
+              <span class="range-val" id="iconRotateIntervalVal">2 seg</span>
+            </div>
+            <p class="hint">Segundos que se muestra cada moneda en el ícono de la barra del navegador</p>
+            <button type="button" class="btn-secondary" id="btnTestRotation" style="margin-top:8px">▶ Probar rotación ahora</button>
+          </div>
+
+          <div class="field-group">
+            <label class="label">Moneda para el badge</label>
+            <select class="input" id="badgeCurrency">
+              <option value="USD">USD — Dólar</option>
+              <option value="EUR">EUR — Euro</option>
+              <option value="MLC">MLC — Moneda Libremente Convertible</option>
+              <option value="ECU">ECU</option>
+            </select>
+          </div>
+
+          <div class="toggles">
+            <div class="toggle-row">
+              <div>
+                <span class="toggle-label">Notificaciones de cambio</span>
+                <span class="toggle-hint">Alerta cuando una moneda cambia significativamente</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="notifyOnChange">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="field-group" id="notifyThresholdGroup">
+            <label class="label">Umbral de notificación</label>
+            <div class="range-row">
+              <input type="range" id="notifyThreshold" min="1" max="20" step="1" class="range">
+              <span class="range-val" id="notifyThresholdVal">5%</span>
+            </div>
+            <p class="hint">Porcentaje mínimo de cambio para disparar una notificación</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── SECCIÓN: NUEVA PESTAÑA ── -->
+      <section class="section" id="section-newtab">
+        <div class="section-header">
+          <h2>Nueva Pestaña &amp; Omnibox</h2>
+          <p>Widget de tasas en la página de nueva pestaña y acceso rápido desde la barra de direcciones</p>
+        </div>
+        <div class="fields">
+          <div class="toggles">
+            <div class="toggle-row">
+              <div>
+                <span class="toggle-label">Mostrar tasas en nueva pestaña</span>
+                <span class="toggle-hint">Reemplaza la nueva pestaña con el widget de tasas del mercado informal</span>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="newTabEnabled">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="label">Acceso rápido por Omnibox</label>
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-top:6px">
+              <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Escribe en la barra de direcciones del navegador:</p>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <code style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--accent);background:rgba(79,124,255,0.1);border:1px solid rgba(79,124,255,0.3);padding:4px 10px;border-radius:4px">et </code>
+                <span style="font-size:11px;color:var(--text3)">→ ver todas las monedas</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap">
+                <code style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--accent);background:rgba(79,124,255,0.1);border:1px solid rgba(79,124,255,0.3);padding:4px 10px;border-radius:4px">et USD</code>
+                <span style="font-size:11px;color:var(--text3)">→ ir directo al dólar</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
