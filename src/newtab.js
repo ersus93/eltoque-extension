@@ -65,7 +65,7 @@ function renderYear() {
   var pct   = (past / total) * 100;
 
   $('ywYear').textContent    = yr;
-  $('ywPct').innerHTML       = pct.toFixed(1)+'<small>%</small>';
+  $('ywPct').innerHTML       = pct.toFixed(1)+'%';
   $('pfill').style.width     = pct.toFixed(3)+'%';
   $('yDaysPast').textContent = Math.floor(past);
   $('yDaysLeft').textContent = Math.ceil(total - past);
