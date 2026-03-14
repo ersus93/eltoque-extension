@@ -88,6 +88,34 @@
           </div>
 
           <div class="field-group">
+            <label class="label">Fuente de datos</label>
+            <div class="btn-group" id="dataSourceGroup">
+              <button class="seg-btn active" data-val="local" id="dataSourceLocal">
+                📡 Directo (API)
+              </button>
+              <button class="seg-btn" data-val="server" id="dataSourceServer">
+                🖥️ Servidor (VPS)
+              </button>
+              <button class="seg-btn" data-val="auto" id="dataSourceAuto">
+                🚀 Automático
+              </button>
+            </div>
+            <p class="hint" id="dataSourceHint">Obtiene datos directamente de la API de ElToque</p>
+          </div>
+
+          <div class="field-group" id="serverUrlGroup" style="display:none">
+            <label class="label">URL del servidor</label>
+            <input type="url" id="serverUrl" class="input" placeholder="https://tuservidor.com/rates.json">
+            <p class="hint">URL donde está el archivo JSON generado por el script del VPS</p>
+          </div>
+
+          <div class="field-group" id="autoServerUrlGroup" style="display:none">
+            <label class="label">URL del servidor automático</label>
+            <input type="url" id="autoServerUrl" class="input" placeholder="http://IP_VPS/rates.json">
+            <p class="hint">URL del servidor predefinido (modo automático)</p>
+          </div>
+
+          <div class="field-group">
             <label class="label">Intervalo de actualización</label>
             <div class="range-row">
               <input type="range" id="updateInterval" min="5" max="240" step="5" class="range">
@@ -158,6 +186,16 @@
               <input type="range" id="fontSize" min="10" max="20" step="1" class="range">
               <span class="range-val" id="fontSizeVal">13 px</span>
             </div>
+          </div>
+
+          <div class="field-group">
+            <label class="label">Tipo de cambio de precio</label>
+            <div class="btn-group" id="showChangeTypeGroup">
+              <button class="seg-btn active" data-val="color">🎨 Color</button>
+              <button class="seg-btn" data-val="amount">💰 Cantidad</button>
+              <button class="seg-btn" data-val="percentage">📊 Porcentaje</button>
+            </div>
+            <p class="hint">Cómo mostrar el cambio de precio: color (flecha), cantidad (+5 CUP) o porcentaje (+2.5%)</p>
           </div>
 
           <div class="toggles">

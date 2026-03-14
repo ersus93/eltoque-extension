@@ -13,12 +13,14 @@
   let settings  = {};
   let rates     = {};
   let changes   = {};
+  let changesAbs = {};
 
   async function init() {
-    const data = await chrome.storage.local.get(['settings', 'currentRates', 'rateChanges']);
-    settings = data.settings ?? {};
-    rates    = data.currentRates ?? {};
-    changes  = data.rateChanges  ?? {};
+    const data = await chrome.storage.local.get(['settings', 'currentRates', 'rateChanges', 'rateChangesAbs']);
+    settings    = data.settings ?? {};
+    rates       = data.currentRates ?? {};
+    changes     = data.rateChanges ?? {};
+    changesAbs  = data.rateChangesAbs ?? {};
     if (settings.overlayEnabled) createOverlay();
   }
 
@@ -34,6 +36,12 @@
       return ia - ib;
     });
     return selected.length > 0 ? sorted.filter(c => selected.includes(c)) : sorted;
+  }
+
+  function fmtCUP(val) {
+    if (val === undefined || val === null || isNaN(val)) return '0';
+    if (Math.abs(val) >= 1000) return val.toLocaleString('es-CU', { maximumFractionDigits: 0 });
+    return val.toFixed(1);
   }
 
   function createOverlay() {
@@ -136,21 +144,42 @@
     const h     = settings.overlayHeight ?? 28;
     const fSize = Math.max(9, h - 16);
     const speed = settings.scrollSpeed ?? 45;
+    
+    // Tipo de cambio a mostrar
+    const showChangeType = settings.showChangeType || 'color';
 
     const items = currencies.map(cur => {
       const val = rates[cur];
       if (val === undefined) return '';
       const ch    = changes[cur] ?? 'neutral';
+      const abs   = changesAbs[cur] ?? { diff: 0, pctChange: 0 };
       const color = ch === 'up' ? colorUp : ch === 'down' ? colorDown : colorN;
       const arrow = ch === 'up' ? '▲' : ch === 'down' ? '▼' : '—';
       const fmtVal = val >= 1000
         ? val.toLocaleString('es-CU', { maximumFractionDigits: 0 })
         : val.toFixed(val % 1 === 0 ? 0 : 1);
 
+      // Determinar qué mostrar según configuración
+      let changeDisplay = '';
+      if (showChangeType === 'amount') {
+        // Mostrar cantidad absoluta
+        if (ch === 'up') changeDisplay = '+' + fmtCUP(abs.diff);
+        else if (ch === 'down') changeDisplay = '-' + fmtCUP(Math.abs(abs.diff));
+        else changeDisplay = '—';
+      } else if (showChangeType === 'percentage') {
+        // Mostrar porcentaje
+        if (ch === 'up') changeDisplay = '+' + abs.pctChange.toFixed(2) + '%';
+        else if (ch === 'down') changeDisplay = abs.pctChange.toFixed(2) + '%';
+        else changeDisplay = '—';
+      } else {
+        // Solo color/flecha (original)
+        changeDisplay = arrow;
+      }
+
       return `<span style="display:inline-flex;align-items:center;gap:3px;padding:0 10px;color:${color};font-size:${fSize}px;font-weight:600;">`
         + `<span style="color:rgba(160,160,190,0.55);font-size:${fSize-1}px;letter-spacing:0.08em;">${cur}</span>`
         + `<span style="font-weight:700;">${fmtVal}</span>`
-        + `<span style="font-size:${fSize-2}px;">${arrow}</span>`
+        + `<span style="font-size:${fSize-2}px;">${changeDisplay}</span>`
         + `</span>`
         + `<span style="color:rgba(100,100,140,0.35);font-size:9px;padding:0 1px;">|</span>`;
     }).join('');
@@ -192,6 +221,7 @@
     if (msg.type === 'RATES_UPDATED') {
       rates   = msg.rates   ?? rates;
       changes = msg.changes ?? changes;
+      if (msg.changesAbs) changesAbs = msg.changesAbs;
       if (settings.overlayEnabled) {
         if (!overlayEl) createOverlay();
         else updateContent();
@@ -212,6 +242,7 @@
     if (ch.settings)      settings = ch.settings.newValue ?? settings;
     if (ch.currentRates)  rates    = ch.currentRates.newValue ?? rates;
     if (ch.rateChanges)   changes  = ch.rateChanges.newValue  ?? changes;
+    if (ch.rateChangesAbs) changesAbs = ch.rateChangesAbs.newValue ?? changesAbs;
     if ((ch.currentRates || ch.rateChanges) && settings.overlayEnabled && overlayEl) {
       updateContent();
     }

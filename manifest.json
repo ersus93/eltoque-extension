@@ -52,7 +52,8 @@
     "alarms",
     "scripting",
     "notifications",
-    "tabs"
+    "tabs",
+    "bookmarks"
   ],
   "host_permissions": [
     "https://tasas.eltoque.com/*",
@@ -60,6 +61,7 @@
     "https://api.binance.us/*",
     "https://api1.binance.com/*",
     "https://api2.binance.com/*",
-    "https://api3.binance.com/*"
+    "https://api3.binance.com/*",
+    "<all_urls>"
   ]
 }

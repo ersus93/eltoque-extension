@@ -114,7 +114,7 @@ var ET_META  = {
   TRX: { name:'TRON',    ico:'⚡'  },
 };
 
-var etRates={}, etChanges={}, etSettings={};
+var etRates={}, etChanges={}, etChangesAbs={}, etSettings={};
 
 // Fallback: direct fetch from API if storage is empty
 async function fetchDirectFromAPI() {
@@ -164,7 +164,7 @@ function loadEtData() {
     return;
   }
   chrome.storage.local.get(
-    ['currentRates','rateChanges','settings','lastUpdated','fetchError'],
+    ['currentRates','rateChanges','rateChangesAbs','settings','lastUpdated','fetchError'],
     function(data){
       console.log('[DEBUG] Storage data received:', data);
       if (chrome.runtime.lastError) {
@@ -172,9 +172,10 @@ function loadEtData() {
         showEtErr(chrome.runtime.lastError.message);
         return;
       }
-      etSettings = data.settings     || {};
-      etRates    = data.currentRates || {};
-      etChanges  = data.rateChanges  || {};
+      etSettings     = data.settings      || {};
+      etRates        = data.currentRates  || {};
+      etChanges      = data.rateChanges   || {};
+      etChangesAbs   = data.rateChangesAbs || {};
 
       console.log('[DEBUG] etRates:', etRates, 'etChanges:', etChanges);
 
@@ -217,6 +218,9 @@ function renderEtGrid() {
   var order = (etSettings.currencyOrder && etSettings.currencyOrder.length)
     ? etSettings.currencyOrder : ET_ORDER;
   var sel = etSettings.selectedCurrencies || [];
+  
+  // Obtener tipo de cambio a mostrar
+  var showChangeType = etSettings.showChangeType || 'color';
 
   var keys = Object.keys(etRates).sort(function(a,b){
     var ia = order.indexOf(a), ib = order.indexOf(b);
@@ -233,10 +237,29 @@ function renderEtGrid() {
   keys.forEach(function(cur) {
     var val    = etRates[cur];
     var ch     = etChanges[cur] || 'neutral';
+    var abs    = etChangesAbs[cur] || { diff: 0, pctChange: 0 };
     var cls    = ch==='up'?'up':ch==='down'?'dn':'neu';
     var meta   = ET_META[cur] || {name:cur, ico:'💱'};
     var price  = fmtCUP(val);
     var arrow  = ch==='up'?'▲':ch==='down'?'▼':'—';
+    
+    // Determinar qué mostrar según configuración
+    var changeDisplay = '';
+    if (showChangeType === 'amount') {
+      // Mostrar cantidad absoluta
+      if (ch === 'up') changeDisplay = '+' + fmtCUP(abs.diff);
+      else if (ch === 'down') changeDisplay = '-' + fmtCUP(Math.abs(abs.diff));
+      else changeDisplay = '—';
+    } else if (showChangeType === 'percentage') {
+      // Mostrar porcentaje
+      if (ch === 'up') changeDisplay = '+' + abs.pctChange.toFixed(2) + '%';
+      else if (ch === 'down') changeDisplay = abs.pctChange.toFixed(2) + '%';
+      else changeDisplay = '—';
+    } else {
+      // Solo color/flecha (original)
+      changeDisplay = arrow;
+    }
+    
     var card   = document.createElement('div');
     card.className = 'rcard '+cls;
     card.dataset.cur = cur;
@@ -249,7 +272,7 @@ function renderEtGrid() {
       '<div class="rcard-unit">CUP</div>' +
       '<div class="rcard-bot">' +
         '<span class="rcard-name">'+meta.name+'</span>' +
-        '<span class="rcard-pct">'+arrow+'</span>' +
+        '<span class="rcard-pct">'+changeDisplay+'</span>' +
       '</div>';
     grid.appendChild(card);
   });
@@ -356,7 +379,8 @@ function renderBnGrid() {
    TICKER — ElToque + Binance combined
 ═════════════════════════════════════════════ */
 function renderTicker() {
-  var strip  = $('tickerStrip');
+  var strip = $('tickerStrip');
+  if (!strip) return; // Safety check - element might not exist
   var items  = [];
   var order  = (etSettings.currencyOrder && etSettings.currencyOrder.length)
     ? etSettings.currencyOrder : ET_ORDER;
@@ -440,9 +464,13 @@ $('btnSettings').addEventListener('click', function(){
 function applyStoredTheme() {
   if (!window.chrome || !chrome.storage) return;
   chrome.storage.local.get(['settings'], function(data) {
-    var theme = data.settings?.pageTheme || 'dark';
+    var theme = data.settings?.pageTheme || 'auto';
     setTheme(theme);
   });
+}
+
+function getSystemTheme() {
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
 function setTheme(theme) {
@@ -450,10 +478,28 @@ function setTheme(theme) {
   document.querySelectorAll('.theme-btn').forEach(function(btn) {
     btn.classList.toggle('active', btn.dataset.theme === theme);
   });
-  if (theme === 'light') {
+  
+  if (theme === 'auto') {
+    // Usar tema del sistema
+    var systemTheme = getSystemTheme();
+    if (systemTheme === 'light') {
+      r.classList.add('light');
+    } else {
+      r.classList.remove('light');
+    }
+  } else if (theme === 'light') {
     r.classList.add('light');
   } else {
     r.classList.remove('light');
+  }
+  
+  // Guardar preferencia
+  if (window.chrome && chrome.storage) {
+    chrome.storage.local.get(['settings'], function(data) {
+      var settings = data.settings || {};
+      settings.pageTheme = theme;
+      chrome.storage.local.set({ settings: settings });
+    });
   }
 }
 
@@ -472,6 +518,18 @@ document.querySelectorAll('.theme-btn').forEach(function(btn) {
 });
 
 applyStoredTheme();
+
+// Listener para cambios del tema del sistema cuando está en modo automático
+if (window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+    chrome.storage.local.get(['settings'], function(data) {
+      var theme = data.settings?.pageTheme || 'auto';
+      if (theme === 'auto') {
+        setTheme('auto');
+      }
+    });
+  });
+}
 
 /* ═══════════════════════════════════════════
    LIVE UPDATES from storage
@@ -504,4 +562,189 @@ if (hash) {
       setTimeout(function(){ el.style.outline=''; }, 2500);
     }
   }, 700);
+}
+
+/* ═══════════════════════════════════════════
+   BOOKMARKS BAR - Barra de favoritos
+═══════════════════════════════════════════ */
+var bookmarksData = {}; // Cache for bookmark children
+
+function getFavicon(url) {
+  try {
+    var parsed = new URL(url);
+    return 'https://www.google.com/s2/favicons?domain=' + parsed.hostname + '&sz=32';
+  } catch(e) {
+    return '';
+  }
+}
+
+function renderBookmarkItem(item) {
+  if (item.url) {
+    var favicon = getFavicon(item.url);
+    var title = item.title.length > 18 ? item.title.substring(0, 18) + '...' : item.title;
+    return '<a class="bm-item" href="' + item.url + '" target="_blank" rel="noopener" title="' + item.title + '">' +
+      (favicon ? '<img src="' + favicon + '" width="14" height="14" style="border-radius:2px">' : '') +
+      '<span>' + title + '</span></a>';
+  }
+  return '';
+}
+
+function renderBookmarkFolder(item) {
+  if (!item.children || item.children.length === 0) return '';
+  
+  // Store children in cache
+  bookmarksData[item.id] = item.children;
+  
+  var title = item.title.length > 12 ? item.title.substring(0, 12) + '...' : item.title;
+  var count = item.children.length;
+  
+  return '<div class="bm-folder-wrapper">' +
+    '<div class="bm-item bm-folder" data-folder="' + item.id + '" title="' + item.title + ' (' + count + ' elementos)">' +
+      '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>' +
+      '<span>' + title + '</span>' +
+    '</div>' +
+    '<div class="bm-dropdown" id="bm-drop-' + item.id + '"></div>' +
+  '</div>';
+}
+
+function loadBookmarks() {
+  var container = document.getElementById('bookmarksContent');
+  if (!container) {
+    console.log('[Bookmarks] Container not found');
+    return;
+  }
+  
+  // Check if chrome.bookmarks is available
+  if (!window.chrome || !chrome.bookmarks) {
+    container.innerHTML = '<span class="bm-empty">Favoritos no disponibles</span>';
+    return;
+  }
+  
+  chrome.bookmarks.getTree(function(nodes) {
+    if (chrome.runtime.lastError) {
+      container.innerHTML = '<span class="bm-empty">Error: ' + chrome.runtime.lastError.message + '</span>';
+      return;
+    }
+    
+    if (!nodes || !nodes[0] || !nodes[0].children) {
+      container.innerHTML = '<span class="bm-empty">Sin favoritos</span>';
+      return;
+    }
+    
+    var root = nodes[0];
+    var children = root.children;
+    
+    // Find Bookmark Bar folder
+    var bookmarkBar = null;
+    for (var i = 0; i < children.length; i++) {
+      if (children[i].title === 'Bookmark Bar' || children[i].title === 'Barra de favoritos') {
+        bookmarkBar = children[i];
+        break;
+      }
+    }
+    
+    var items = bookmarkBar && bookmarkBar.children ? bookmarkBar.children : children;
+    
+    if (!items || items.length === 0) {
+      container.innerHTML = '<span class="bm-empty">Sin favoritos</span>';
+      return;
+    }
+    
+    // Render bookmarks and folders
+    var html = '';
+    var maxItems = 25;
+    var count = 0;
+    
+    for (var j = 0; j < items.length && count < maxItems; j++) {
+      var item = items[j];
+      
+      if (item.url) {
+        html += renderBookmarkItem(item);
+        count++;
+      } else if (item.children && item.children.length > 0) {
+        html += renderBookmarkFolder(item);
+        count++;
+      }
+    }
+    
+    if (!html) {
+      container.innerHTML = '<span class="bm-empty">Sin favoritos</span>';
+      return;
+    }
+    
+    container.innerHTML = html;
+    
+    // Attach click events to folders - using onclick for reliability
+    var folders = container.querySelectorAll('.bm-folder');
+    console.log('[Bookmarks] Found folders:', folders.length);
+    
+    for (var f = 0; f < folders.length; f++) {
+      (function(folder) {
+        folder.onclick = function(e) {
+          console.log('[Bookmarks] Folder clicked:', folder.getAttribute('data-folder'));
+          e.preventDefault ? e.preventDefault() : (e.returnValue = false);
+          e.stopPropagation ? e.stopPropagation() : (e.cancelBubble = true);
+          
+          var folderId = folder.getAttribute('data-folder');
+          var dropdown = document.getElementById('bm-drop-' + folderId);
+          console.log('[Bookmarks] Dropdown element:', dropdown);
+          if (!dropdown) return;
+          
+          // Close other dropdowns
+          var allDropdowns = container.querySelectorAll('.bm-dropdown.show');
+          console.log('[Bookmarks] Other dropdowns open:', allDropdowns.length);
+          for (var d = 0; d < allDropdowns.length; d++) {
+            if (allDropdowns[d] !== dropdown) {
+              allDropdowns[d].classList.remove('show');
+            }
+          }
+          
+          // Toggle current
+          if (dropdown.classList.contains('show')) {
+            dropdown.classList.remove('show');
+            console.log('[Bookmarks] Dropdown closed');
+          } else {
+            console.log('[Bookmarks] Opening dropdown...');
+            // Populate dropdown if empty
+            if (dropdown.innerHTML.trim() === '') {
+              var childs = bookmarksData[folderId];
+              console.log('[Bookmarks] Children in cache:', childs ? childs.length : 0);
+              if (childs && childs.length > 0) {
+                var dropHtml = '';
+                for (var c = 0; c < childs.length; c++) {
+                  if (childs[c].url) {
+                    var fav = getFavicon(childs[c].url);
+                    dropHtml += '<a class="bm-dropdown-item" href="' + childs[c].url + '" target="_blank" rel="noopener">';
+                    if (fav) dropHtml += '<img src="' + fav + '">';
+                    dropHtml += '<span>' + childs[c].title + '</span></a>';
+                  }
+                }
+                dropdown.innerHTML = dropHtml;
+              }
+            }
+            dropdown.classList.add('show');
+            console.log('[Bookmarks] Dropdown should be visible now');
+          }
+        };
+      })(folders[f]);
+    }
+    
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.bm-folder-wrapper')) {
+        container.querySelectorAll('.bm-dropdown.show').forEach(function(d) {
+          d.classList.remove('show');
+        });
+      }
+    });
+    
+    console.log('[Bookmarks] Loaded successfully');
+  });
+}
+
+// Load bookmarks when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', loadBookmarks);
+} else {
+  loadBookmarks();
 }

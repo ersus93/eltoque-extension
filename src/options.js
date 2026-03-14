@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════════
-//  ElToque Tasas — Options v2
+//  ElToque Tasas — Options v3
+//  Soporte modo servidor + mostrar cambios
 // ═══════════════════════════════════════════════
 
 const PREFERRED_ORDER = ['EUR', 'USD', 'MLC', 'BTC', 'USDT', 'TRX'];
@@ -29,6 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initDragDrop();
   initIconRotateSection();
   initTestRotation();
+  initDataSourceButtons();
 });
 
 async function loadAll() {
@@ -56,6 +58,16 @@ function initNav() {
 function initFields() {
   setVal('apiUrl', settings.apiUrl);
   setVal('apiKey', settings.apiKey);
+  
+  // Modo servidor
+  setSegmented('dataSourceGroup', settings.dataSource ?? 'local');
+  setVal('serverUrl', settings.serverUrl ?? '');
+  setVal('autoServerUrl', settings.autoServerUrl ?? '');
+  updateServerUrlVisibility();
+  
+  // Tipo de cambio
+  setSegmented('showChangeTypeGroup', settings.showChangeType ?? 'color');
+  
   setRange('updateInterval', settings.updateInterval, v => v < 60 ? `${v} min` : `${(v/60).toFixed(1)} h`);
 
   setSegmented('scrollDirectionGroup', settings.scrollDirection ?? 'horizontal');
@@ -94,6 +106,41 @@ function initFields() {
 function initIconRotateSection() {
   setCheck('iconRotateEnabled', settings.iconRotateEnabled !== false);
   setRange('iconRotateInterval', settings.iconRotateInterval ?? 2, v => `${v} seg`);
+}
+
+// ── Server URL visibility ────────────────────────────
+function updateServerUrlVisibility() {
+  const mode = getSegmented('dataSourceGroup');
+  const serverUrlGroup = document.getElementById('serverUrlGroup');
+  const autoServerUrlGroup = document.getElementById('autoServerUrlGroup');
+  const hint = document.getElementById('dataSourceHint');
+  
+  if (mode === 'server') {
+    serverUrlGroup.style.display = 'block';
+    autoServerUrlGroup.style.display = 'none';
+    hint.textContent = 'Obtiene datos desde tu servidor VPS externo';
+  } else if (mode === 'auto') {
+    serverUrlGroup.style.display = 'none';
+    autoServerUrlGroup.style.display = 'block';
+    hint.textContent = 'Usa el servidor predefinido (puente para evitar bloqueos)';
+  } else {
+    serverUrlGroup.style.display = 'none';
+    autoServerUrlGroup.style.display = 'none';
+    hint.textContent = 'Obtiene datos directamente de la API de ElToque';
+  }
+}
+
+function initDataSourceButtons() {
+  const group = document.getElementById('dataSourceGroup');
+  if (!group) return;
+  
+  group.querySelectorAll('.seg-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      group.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      updateServerUrlVisibility();
+    });
+  });
 }
 
 // ── Currencies list ───────────────────────────
@@ -239,6 +286,10 @@ async function saveSettings() {
 function collectSettings() {
   settings.apiUrl         = getVal('apiUrl');
   settings.apiKey         = getVal('apiKey');
+  settings.dataSource     = getSegmented('dataSourceGroup');
+  settings.serverUrl      = getVal('serverUrl');
+  settings.autoServerUrl  = getVal('autoServerUrl');
+  settings.showChangeType = getSegmented('showChangeTypeGroup');
   settings.updateInterval = getNum('updateInterval');
 
   settings.scrollDirection  = getSegmented('scrollDirectionGroup');

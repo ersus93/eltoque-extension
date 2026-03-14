@@ -1,0 +1,35 @@
+[Unit]
+Description=ElToque Rate Fetcher - Consulta tasas de ElToque y Binance
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Ruta al directorio del proyecto - AJUSTAR SEGÚN TU INSTALACIÓN
+ExecStart=/usr/bin/node /opt/eltoque-rate-fetcher/rate-fetcher.js
+WorkingDirectory=/opt/eltoque-rate-fetcher
+
+# Usuario que ejecutará el servicio - AJUSTAR SEGÚN TU CONFIGURACIÓN
+User=www-data
+Group=www-data
+
+# Variables de entorno (opcional)
+Environment=NODE_ENV=production
+Environment=OUTPUT_FILE=/var/www/rates.json
+
+# Seguridad
+NoNewPrivileges=true
+PrivateTmp=true
+ReadWritePaths=/var/www
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rate-fetcher
+
+# Reinicio automático en caso de fallo
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

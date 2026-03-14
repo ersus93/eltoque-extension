@@ -1,0 +1,17 @@
+[Unit]
+Description=Timer para ElToque Rate Fetcher - Ejecuta cada 5 minutos
+Requires=rate-fetcher.service
+
+[Timer]
+# Ejecutar cada 5 minutos
+OnBootSec=1min
+OnUnitActiveSec=5min
+
+# Tiempo máximo para iniciar el servicio
+AccuracySec=1min
+
+# Persistir para ejecutar tareas perdidas al reiniciar
+Persistent=true
+
+[Install]
+WantedBy=timers.target
