@@ -38,7 +38,16 @@ const CONFIG = {
   TIMEOUT: 10000,
   
   // Intervalo de actualización (ms) - 5 minutos
-  INTERVAL: 5 * 60 * 1000
+  INTERVAL: 5 * 60 * 1000,
+
+  // Retry configuration
+  MAX_RETRIES: 3,
+  INITIAL_BACKOFF_MS: 1000,
+  BACKOFF_MULTIPLIER: 2,
+
+  // Circuit breaker configuration
+  CIRCUIT_BREAKER_FAILURE_THRESHOLD: 5,
+  CIRCUIT_BREAKER_RESET_TIMEOUT_MS: 60000
 };
 
 // Símbolos a monitorear en Binance
@@ -49,6 +58,88 @@ const BINANCE_SYMBOL_MAP = {
   'SOLUSDT': 'SOL',
   'XRPUSDT': 'XRP',
   'ADAUSDT': 'ADA'
+};
+
+// ============================================
+// ERROR TYPES
+// ============================================
+class NetworkError extends Error {
+  constructor(message, originalError) {
+    super(message);
+    this.name = 'NetworkError';
+    this.originalError = originalError;
+  }
+}
+
+class HttpError extends Error {
+  constructor(message, statusCode) {
+    super(message);
+    this.name = 'HttpError';
+    this.statusCode = statusCode;
+  }
+}
+
+// ============================================
+// CIRCUIT BREAKER
+// ============================================
+class CircuitBreaker {
+  constructor(name, failureThreshold, resetTimeout) {
+    this.name = name;
+    this.failureThreshold = failureThreshold;
+    this.resetTimeout = resetTimeout;
+    this.failureCount = 0;
+    this.lastFailureTime = null;
+    this.state = 'CLOSED';
+  }
+
+  canExecute() {
+    if (this.state === 'OPEN') {
+      const now = Date.now();
+      if (this.lastFailureTime && (now - this.lastFailureTime) >= this.resetTimeout) {
+        this.state = 'HALF_OPEN';
+        log(`[CIRCUIT BREAKER ${this.name}] State: HALF_OPEN`, 'INFO');
+        return true;
+      }
+      return false;
+    }
+    return true;
+  }
+
+  recordSuccess() {
+    this.failureCount = 0;
+    if (this.state === 'HALF_OPEN') {
+      this.state = 'CLOSED';
+      log(`[CIRCUIT BREAKER ${this.name}] State: CLOSED`, 'INFO');
+    }
+  }
+
+  recordFailure() {
+    this.failureCount++;
+    this.lastFailureTime = Date.now();
+    
+    if (this.failureCount >= this.failureThreshold) {
+      this.state = 'OPEN';
+      log(`[CIRCUIT BREAKER ${this.name}] State: OPEN (failures: ${this.failureCount})`, 'WARN');
+    }
+  }
+
+  getState() {
+    return this.state;
+  }
+}
+
+// Circuit breakers for each API
+const circuitBreakers = {
+  eltoque: new CircuitBreaker(
+    'ElToque',
+    CONFIG.CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+    CONFIG.CIRCUIT_BREAKER_RESET_TIMEOUT_MS
+  ),
+  binance: new CircuitBreaker(
+    'Binance',
+    CONFIG.CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+    CONFIG.CIRCUIT_BREAKER_RESET_TIMEOUT_MS
+  )
 };
 
 // ============================================
@@ -73,63 +164,123 @@ function extractNumber(value) {
 }
 
 // ============================================
+// RETRY WITH EXPONENTIAL BACKOFF
+// ============================================
+async function fetchWithRetry(fetchFn, circuitBreakerName) {
+  const circuitBreaker = circuitBreakers[circuitBreakerName];
+  let lastError;
+  
+  for (let attempt = 1; attempt <= CONFIG.MAX_RETRIES; attempt++) {
+    if (!circuitBreaker.canExecute()) {
+      log(`[RETRY] Circuit breaker OPEN for ${circuitBreakerName}, skipping request`, 'WARN');
+      throw new Error(`Circuit breaker OPEN for ${circuitBreakerName}`);
+    }
+
+    try {
+      const result = await fetchFn();
+      circuitBreaker.recordSuccess();
+      return result;
+    } catch (error) {
+      lastError = error;
+      
+      // Determine error type
+      const isNetworkError = error instanceof NetworkError || 
+        error.name === 'AbortError' ||
+        error.message.includes('ECONNREFUSED') ||
+        error.message.includes('ENOTFOUND') ||
+        error.message.includes('ETIMEDOUT') ||
+        error.message.includes('socket hang up');
+      
+      const isHttpError = error instanceof HttpError;
+      
+      log(`[RETRY] Attempt ${attempt}/${CONFIG.MAX_RETRIES} failed for ${circuitBreakerName}: ${error.message} (${isNetworkError ? 'NETWORK' : isHttpError ? 'HTTP' : 'UNKNOWN'})`, 'WARN');
+      
+      if (isNetworkError || isHttpError) {
+        circuitBreaker.recordFailure();
+      }
+      
+      if (attempt < CONFIG.MAX_RETRIES) {
+        const backoffMs = CONFIG.INITIAL_BACKOFF_MS * Math.pow(CONFIG.BACKOFF_MULTIPLIER, attempt - 1);
+        log(`[RETRY] Waiting ${backoffMs}ms before retry...`, 'INFO');
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
+// ============================================
 // FETCH ELTOQUE
 // ============================================
-async function fetchElToque() {
+async function fetchElToqueRaw() {
   log('Consultando API de ElToque...');
   
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CONFIG.TIMEOUT);
+  
+  const headers = { 'Accept': 'application/json' };
+  
+  // Añadir API Key si está configurada
+  if (CONFIG.ELTOQUE_API_KEY) {
+    headers['Authorization'] = `Bearer ${CONFIG.ELTOQUE_API_KEY}`;
+    log('Usando API Key de ElToque');
+  }
+  
+  let response;
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), CONFIG.TIMEOUT);
-    
-    const headers = { 'Accept': 'application/json' };
-    
-    // Añadir API Key si está configurada
-    if (CONFIG.ELTOQUE_API_KEY) {
-      headers['Authorization'] = `Bearer ${CONFIG.ELTOQUE_API_KEY}`;
-      log('Usando API Key de ElToque');
-    }
-    
-    const response = await fetch(CONFIG.ELTOQUE_API, {
+    response = await fetch(CONFIG.ELTOQUE_API, {
       signal: controller.signal,
       headers
     });
-    
-    clearTimeout(timeout);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
-    const raw = await response.json();
-    const rates = {};
-    
-    // Procesar respuesta
-    if (raw.tasas && typeof raw.tasas === 'object') {
-      for (const [key, value] of Object.entries(raw.tasas)) {
-        const num = extractNumber(value);
-        if (num !== null) {
-          // Normalizar claves
-          let normalizedKey = key.toUpperCase();
-          if (normalizedKey === 'ECU') normalizedKey = 'EUR';
-          if (normalizedKey.startsWith('USDT_')) normalizedKey = 'USDT';
-          rates[normalizedKey] = num;
-        }
-      }
-    } else if (raw.rates && typeof raw.rates === 'object') {
-      for (const [key, value] of Object.entries(raw.rates)) {
-        const num = extractNumber(value);
-        if (num !== null) {
-          rates[key.toUpperCase()] = num;
-        }
-      }
-    }
-    
-    log(`ElToque: ${Object.keys(rates).length} tasas obtenidas`);
-    return rates;
-    
   } catch (error) {
-    log(`Error consultando ElToque: ${error.message}`, 'ERROR');
+    clearTimeout(timeout);
+    if (error.name === 'AbortError') {
+      throw new NetworkError('Request timeout', error);
+    }
+    throw new NetworkError(`Network error: ${error.message}`, error);
+  }
+  
+  clearTimeout(timeout);
+  
+  if (!response.ok) {
+    throw new HttpError(`HTTP ${response.status}`, response.status);
+  }
+  
+  const raw = await response.json();
+  const rates = {};
+  
+  // Procesar respuesta
+  if (raw.tasas && typeof raw.tasas === 'object') {
+    for (const [key, value] of Object.entries(raw.tasas)) {
+      const num = extractNumber(value);
+      if (num !== null) {
+        // Normalizar claves
+        let normalizedKey = key.toUpperCase();
+        if (normalizedKey === 'ECU') normalizedKey = 'EUR';
+        if (normalizedKey.startsWith('USDT_')) normalizedKey = 'USDT';
+        rates[normalizedKey] = num;
+      }
+    }
+  } else if (raw.rates && typeof raw.rates === 'object') {
+    for (const [key, value] of Object.entries(raw.rates)) {
+      const num = extractNumber(value);
+      if (num !== null) {
+        rates[key.toUpperCase()] = num;
+      }
+    }
+  }
+  
+  log(`ElToque: ${Object.keys(rates).length} tasas obtenidas`);
+  return rates;
+}
+
+async function fetchElToque() {
+  try {
+    return await fetchWithRetry(fetchElToqueRaw, 'eltoque');
+  } catch (error) {
+    const errorType = error instanceof NetworkError ? 'NETWORK' : error instanceof HttpError ? 'HTTP' : 'UNKNOWN';
+    log(`Error consultando ElToque (${errorType}): ${error.message}`, 'ERROR');
     return null;
   }
 }
@@ -137,7 +288,7 @@ async function fetchElToque() {
 // ============================================
 // FETCH BINANCE
 // ============================================
-async function fetchBinance() {
+async function fetchBinanceRaw() {
   log('Consultando API de Binance...');
   
   const errors = [];
@@ -152,11 +303,21 @@ async function fetchBinance() {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), CONFIG.TIMEOUT);
       
-      const response = await fetch(url, { signal: controller.signal });
+      let response;
+      try {
+        response = await fetch(url, { signal: controller.signal });
+      } catch (error) {
+        clearTimeout(timeout);
+        if (error.name === 'AbortError') {
+          throw new NetworkError('Request timeout', error);
+        }
+        throw new NetworkError(`Network error: ${error.message}`, error);
+      }
+      
       clearTimeout(timeout);
       
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        throw new HttpError(`HTTP ${response.status}`, response.status);
       }
       
       const data = await response.json();
@@ -190,13 +351,23 @@ async function fetchBinance() {
       return { rates, changes };
       
     } catch (error) {
-      errors.push(`${apiUrl.split('/')[2]}: ${error.message}`);
+      const isNetworkError = error instanceof NetworkError || error instanceof HttpError;
+      errors.push(`${apiUrl.split('/')[2]}: ${error.message}${isNetworkError ? '' : ' (non-HTTP/non-network)'}`);
       continue;
     }
   }
   
-  log(`Error consultando Binance: ${errors.join('; ')}`, 'ERROR');
-  return null;
+  throw new NetworkError(`All Binance APIs failed: ${errors.join('; ')}`, new Error(errors.join('; ')));
+}
+
+async function fetchBinance() {
+  try {
+    return await fetchWithRetry(fetchBinanceRaw, 'binance');
+  } catch (error) {
+    const errorType = error instanceof NetworkError ? 'NETWORK' : error instanceof HttpError ? 'HTTP' : 'UNKNOWN';
+    log(`Error consultando Binance (${errorType}): ${error.message}`, 'ERROR');
+    return null;
+  }
 }
 
 // ============================================
@@ -345,8 +516,17 @@ async function run() {
   }
 }
 
+// Handle uncaught errors in async operations
+process.on('unhandledRejection', (reason, promise) => {
+  log(`Unhandled Promise Rejection: ${reason}`, 'ERROR');
+  process.exit(1);
+});
+
 // Ejecutar inmediatamente
-run();
+run().catch(error => {
+  log(`Error en run(): ${error.message}`, 'ERROR');
+  process.exit(1);
+});
 
 // También exportar para testing
-module.exports = { fetchElToque, fetchBinance, generateRatesData, CONFIG };
+module.exports = { fetchElToque, fetchBinance, generateRatesData, saveRatesData, run, CONFIG, CircuitBreaker, NetworkError, HttpError };

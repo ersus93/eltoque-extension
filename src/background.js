@@ -29,12 +29,10 @@ const DEFAULT_SETTINGS = {
   apiUrl:             API_URL,
   apiKey:             '',
   updateInterval:     30,
-  // Modo servidor (opcional)
-  dataSource:         'local',      // 'local' = API directa, 'server' = tu VPS, 'auto' = servidor predefinido
-  serverUrl:          '',           // URL del VPS donde está el JSON (para modo server)
-  autoServerUrl:      '',           // URL del servidor automático (modo auto)
-  // Mostrar cambios
-  showChangeType:     'color',      // 'color' | 'amount' | 'percentage'
+  dataSource:         'local',
+  serverUrl:          '',
+  autoServerUrl:      '',
+  showChangeType:     'color',
   scrollDirection:    'horizontal',
   scrollSpeed:        40,
   fontSize:           13,
@@ -63,29 +61,53 @@ const DEFAULT_SETTINGS = {
   notifyThreshold:    5,
 };
 
-// ── Estado en memoria ──
+function deepClone(obj) {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(item => deepClone(item));
+  const cloned = {};
+  for (const [key, val] of Object.entries(obj)) {
+    cloned[key] = deepClone(val);
+  }
+  return cloned;
+}
+
 let cachedRates    = {};
 let cachedChanges  = {};
-let cachedCfg      = { ...DEFAULT_SETTINGS };
+let cachedCfg      = deepClone(DEFAULT_SETTINGS);
 let swTimer        = null;
 
-// ═══════════════════════════════════════════════
-//  LIFECYCLE
-// ═══════════════════════════════════════════════
+const browserAction = chrome.action ?? chrome.browserAction;
+
+function log(message, type = 'INFO') {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] [${type}] ${message}`);
+}
 
 chrome.runtime.onInstalled.addListener(async () => {
   const stored = await chrome.storage.local.get('settings');
   if (!stored.settings) {
-    await chrome.storage.local.set({ settings: DEFAULT_SETTINGS });
+    await chrome.storage.local.set({ settings: deepClone(DEFAULT_SETTINGS) });
   }
   await setupAlarms();
   await fetchRates();
 });
 
 chrome.runtime.onStartup.addListener(async () => {
+  clearInternalTimer();
   await setupAlarms();
   await hydrateCache();
   kickInternalTimer();
+});
+
+function clearInternalTimer() {
+  if (swTimer) {
+    clearInterval(swTimer);
+    swTimer = null;
+  }
+}
+
+self.addEventListener('activate', () => {
+  clearInternalTimer();
 });
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
@@ -103,15 +125,13 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  console.log('[DEBUG BG] Message received:', msg);
   if (msg.type === 'FETCH_NOW') {
-    console.log('[DEBUG BG] FETCH_NOW received, calling fetchRates');
     fetchRates().then(() => sendResponse({ ok: true }));
     return true;
   }
   if (msg.type === 'RESET_SETTINGS') {
-    chrome.storage.local.set({ settings: DEFAULT_SETTINGS }).then(async () => {
-      cachedCfg = { ...DEFAULT_SETTINGS };
+    chrome.storage.local.set({ settings: deepClone(DEFAULT_SETTINGS) }).then(async () => {
+      cachedCfg = deepClone(DEFAULT_SETTINGS);
       await setupAlarms();
       await resetRotation();
       sendResponse({ ok: true });
@@ -120,7 +140,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.type === 'UPDATE_INTERVAL') {
     chrome.storage.local.get('settings').then(async ({ settings }) => {
-      cachedCfg = settings ?? DEFAULT_SETTINGS;
+      cachedCfg = settings ?? deepClone(DEFAULT_SETTINGS);
       await setupAlarms();
       await resetRotation();
       kickInternalTimer();
@@ -129,7 +149,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg.type === 'GET_DEFAULTS') {
-    sendResponse({ defaults: DEFAULT_SETTINGS });
+    sendResponse({ defaults: deepClone(DEFAULT_SETTINGS) });
   }
   if (msg.type === 'GET_RATES') {
     sendResponse({ rates: cachedRates, changes: cachedChanges });
@@ -143,13 +163,9 @@ async function hydrateCache() {
   if (data.settings)     cachedCfg     = data.settings;
 }
 
-// ═══════════════════════════════════════════════
-//  ALARMAS
-// ═══════════════════════════════════════════════
-
 async function setupAlarms() {
   await chrome.alarms.clearAll();
-  const cfg      = cachedCfg.apiUrl ? cachedCfg : (await chrome.storage.local.get('settings')).settings ?? DEFAULT_SETTINGS;
+  const cfg      = cachedCfg.apiUrl ? cachedCfg : (await chrome.storage.local.get('settings')).settings ?? deepClone(DEFAULT_SETTINGS);
   const interval = cfg.updateInterval ?? 30;
 
   chrome.alarms.create(ALARM_FETCH, {
@@ -162,10 +178,6 @@ async function setupAlarms() {
     periodInMinutes: 1,
   });
 }
-
-// ═══════════════════════════════════════════════
-//  ROTACIÓN
-// ═══════════════════════════════════════════════
 
 function getOrderedCurrencies() {
   const order    = cachedCfg.currencyOrder?.length > 0 ? cachedCfg.currencyOrder : PREFERRED_ORDER;
@@ -216,7 +228,7 @@ async function advanceRotation() {
 }
 
 function kickInternalTimer() {
-  if (swTimer) { clearInterval(swTimer); swTimer = null; }
+  clearInternalTimer();
   if (!cachedCfg.iconRotateEnabled) return;
 
   const intervalSec = Math.max(1, cachedCfg.iconRotateInterval ?? 2);
@@ -227,13 +239,9 @@ function kickInternalTimer() {
   }, intervalMs);
 
   setTimeout(() => {
-    if (swTimer) { clearInterval(swTimer); swTimer = null; }
+    clearInternalTimer();
   }, 25000);
 }
-
-// ═══════════════════════════════════════════════
-//  MOSTRAR MONEDA EN ÍCONO
-// ═══════════════════════════════════════════════
 
 async function displayCurrency(currency) {
   const val = cachedRates[currency];
@@ -253,17 +261,13 @@ async function displayCurrency(currency) {
   setBadge(price, change === 'up' ? colorUp : change === 'down' ? colorDn : '#1e1e38');
 
   try {
-    chrome.action.setTitle({
+    browserAction.setTitle({
       title: `${currency}: ${price} CUP ${arrow}\nElToque — clic para ver todas`
     });
   } catch (_) {}
 
   await renderIcon(currency, price, change, accent, colorUp, colorDn);
 }
-
-// ═══════════════════════════════════════════════
-//  CANVAS: ÍCONO CON LOGO + TEXTO
-// ═══════════════════════════════════════════════
 
 async function renderIcon(currency, price, change, accent, colorUp, colorDn) {
   const S = 128;
@@ -337,10 +341,10 @@ async function renderIcon(currency, price, change, accent, colorUp, colorDn) {
     ctx.fill();
 
     const imageData = ctx.getImageData(0, 0, S, S);
-    await chrome.action.setIcon({ imageData });
+    await browserAction.setIcon({ imageData });
 
   } catch (e) {
-    console.warn('[ElToque icon]', e.message);
+    log(`Error al renderizar ícono: ${e.message}`, 'WARN');
   }
 }
 
@@ -367,8 +371,8 @@ function rr(ctx, x, y, w, h, r) {
 
 function setBadge(text, bg) {
   try {
-    chrome.action.setBadgeText({ text: String(text) });
-    chrome.action.setBadgeBackgroundColor({ color: bg ?? '#1a1a3a' });
+    browserAction.setBadgeText({ text: String(text) });
+    browserAction.setBadgeBackgroundColor({ color: bg ?? '#1a1a3a' });
   } catch (_) {}
 }
 
@@ -380,14 +384,7 @@ function fmtPrice(val) {
   return val % 1 === 0 ? String(val) : val.toFixed(1);
 }
 
-// ═══════════════════════════════════════════════
-//  FETCH API
-// ═══════════════════════════════════════════════
-
-// Fetch desde servidor VPS (JSON externo)
 async function fetchFromServer(serverUrl) {
-  console.log('[DEBUG BG] fetchFromServer called, URL:', serverUrl);
-  
   if (!serverUrl) {
     throw new Error('URL del servidor no configurada');
   }
@@ -402,11 +399,9 @@ async function fetchFromServer(serverUrl) {
     });
     clearTimeout(timeout);
     
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`Error HTTP: ${res.status}`);
     
     const data = await res.json();
-    console.log('[DEBUG BG] Server data received');
-    
     const rates = data.rates || {};
     
     const storageData = await chrome.storage.local.get('currentRates');
@@ -440,16 +435,12 @@ async function fetchFromServer(serverUrl) {
 }
 
 async function fetchRates() {
-  console.log('[DEBUG BG] fetchRates called');
   try {
     const { settings } = await chrome.storage.local.get('settings');
-    const cfg = settings ?? DEFAULT_SETTINGS;
+    const cfg = settings ?? deepClone(DEFAULT_SETTINGS);
     cachedCfg = cfg;
 
-    // Determinar modo de obtención de datos
-    // Modo AUTO: usa servidor predefinido
     if (cfg.dataSource === 'auto' && cfg.autoServerUrl) {
-      console.log('[DEBUG BG] Using AUTO mode, URL:', cfg.autoServerUrl);
       try {
         const serverData = await fetchFromServer(cfg.autoServerUrl);
         const { rates, changes, changesAbs, prevSnap } = serverData;
@@ -474,14 +465,11 @@ async function fetchRates() {
         broadcastToTabs({ type: 'RATES_UPDATED', rates, changes, changesAbs, lastUpdated: now });
         return;
       } catch (autoErr) {
-        console.error('[ElToque Auto Mode]', autoErr.message);
-        console.log('[DEBUG BG] Auto mode failed, falling back to local mode');
+        log(`Error en modo automático: ${autoErr.message}`, 'ERROR');
       }
     }
 
-    // Modo SERVER: usa servidor propio del usuario
     if (cfg.dataSource === 'server' && cfg.serverUrl) {
-      console.log('[DEBUG BG] Using SERVER mode, URL:', cfg.serverUrl);
       try {
         const serverData = await fetchFromServer(cfg.serverUrl);
         const { rates, changes, changesAbs, prevSnap } = serverData;
@@ -506,29 +494,22 @@ async function fetchRates() {
         broadcastToTabs({ type: 'RATES_UPDATED', rates, changes, changesAbs, lastUpdated: now });
         return;
       } catch (serverErr) {
-        console.error('[ElToque Server Mode]', serverErr.message);
-        console.log('[DEBUG BG] Server failed, falling back to local mode');
+        log(`Error en modo servidor: ${serverErr.message}`, 'ERROR');
       }
     }
 
-    // Modo LOCAL (original)
-    console.log('[DEBUG BG] Using LOCAL mode');
     const headers = { 'Accept': 'application/json' };
     if (cfg.apiKey) headers['Authorization'] = `Bearer ${cfg.apiKey}`;
 
-    console.log('[DEBUG BG] Fetching from:', cfg.apiUrl || API_URL);
     const res = await fetch(cfg.apiUrl || API_URL, { headers });
-    console.log('[DEBUG BG] Response status:', res.status);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`Error HTTP: ${res.status}`);
 
     const raw      = await res.json();
-    console.log('[DEBUG BG] Raw data:', raw);
     const rawRates = parseRates(raw);
     if (!rawRates || Object.keys(rawRates).length === 0)
-      throw new Error('Respuesta vacía');
+      throw new Error('Respuesta vacía del servidor');
 
     const rates = normalizeCurrencyKeys(rawRates);
-    console.log('[DEBUG BG] Parsed rates:', rates);
 
     const { currentRates } = await chrome.storage.local.get('currentRates');
     const prevSnap = currentRates ?? {};
@@ -568,14 +549,10 @@ async function fetchRates() {
   } catch (err) {
     await chrome.storage.local.set({ fetchError: err.message });
     setBadge('ERR', '#c00');
-    try { chrome.action.setTitle({ title: `ElToque: Error — ${err.message}` }); } catch (_) {}
-    console.error('[ElToque]', err);
+    try { browserAction.setTitle({ title: `ElToque: Error — ${err.message}` }); } catch (_) {}
+    log(`Error al obtener tasas: ${err.message}`, 'ERROR');
   }
 }
-
-// ═══════════════════════════════════════════════
-//  OMNIBOX
-// ═══════════════════════════════════════════════
 
 chrome.omnibox.onInputStarted.addListener(() => {
   chrome.omnibox.setDefaultSuggestion({
@@ -620,10 +597,6 @@ chrome.omnibox.onInputEntered.addListener((text, disposition) => {
   if (disposition === 'currentTab') chrome.tabs.update({ url });
   else chrome.tabs.create({ url });
 });
-
-// ═══════════════════════════════════════════════
-//  PARSEO / NORMALIZACIÓN
-// ═══════════════════════════════════════════════
 
 function normalizeCurrencyKeys(raw) {
   const result = {};
@@ -679,10 +652,6 @@ function extractNum(val) {
   }
   return null;
 }
-
-// ═══════════════════════════════════════════════
-//  NOTIFICACIONES + BROADCAST
-// ═══════════════════════════════════════════════
 
 function checkNotifications(current, previous, changes, cfg) {
   const threshold = cfg.notifyThreshold || 5;

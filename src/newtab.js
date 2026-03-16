@@ -674,56 +674,71 @@ function loadBookmarks() {
     
     container.innerHTML = html;
     
-    // Attach click events to folders - using onclick for reliability
+    // Mover todos los dropdowns al body para evitar el clipping del overflow del bookmarksBar
+    container.querySelectorAll('.bm-dropdown').forEach(function(dd) {
+      document.body.appendChild(dd);
+    });
+    
+    // Attach click events to folders
     var folders = container.querySelectorAll('.bm-folder');
-    console.log('[Bookmarks] Found folders:', folders.length);
     
     for (var f = 0; f < folders.length; f++) {
       (function(folder) {
         folder.onclick = function(e) {
-          console.log('[Bookmarks] Folder clicked:', folder.getAttribute('data-folder'));
-          e.preventDefault ? e.preventDefault() : (e.returnValue = false);
-          e.stopPropagation ? e.stopPropagation() : (e.cancelBubble = true);
+          e.preventDefault();
+          e.stopPropagation();
           
           var folderId = folder.getAttribute('data-folder');
           var dropdown = document.getElementById('bm-drop-' + folderId);
-          console.log('[Bookmarks] Dropdown element:', dropdown);
           if (!dropdown) return;
           
           // Close other dropdowns
-          var allDropdowns = container.querySelectorAll('.bm-dropdown.show');
-          console.log('[Bookmarks] Other dropdowns open:', allDropdowns.length);
-          for (var d = 0; d < allDropdowns.length; d++) {
-            if (allDropdowns[d] !== dropdown) {
-              allDropdowns[d].classList.remove('show');
-            }
-          }
+          document.querySelectorAll('.bm-dropdown.show').forEach(function(d) {
+            if (d !== dropdown) d.classList.remove('show');
+          });
           
           // Toggle current
           if (dropdown.classList.contains('show')) {
             dropdown.classList.remove('show');
-            console.log('[Bookmarks] Dropdown closed');
           } else {
-            console.log('[Bookmarks] Opening dropdown...');
             // Populate dropdown if empty
             if (dropdown.innerHTML.trim() === '') {
               var childs = bookmarksData[folderId];
-              console.log('[Bookmarks] Children in cache:', childs ? childs.length : 0);
               if (childs && childs.length > 0) {
                 var dropHtml = '';
                 for (var c = 0; c < childs.length; c++) {
-                  if (childs[c].url) {
-                    var fav = getFavicon(childs[c].url);
-                    dropHtml += '<a class="bm-dropdown-item" href="' + childs[c].url + '" target="_blank" rel="noopener">';
+                  var child = childs[c];
+                  if (child.url) {
+                    var fav = getFavicon(child.url);
+                    dropHtml += '<a class="bm-dropdown-item" href="' + child.url + '" target="_blank" rel="noopener">';
                     if (fav) dropHtml += '<img src="' + fav + '">';
-                    dropHtml += '<span>' + childs[c].title + '</span></a>';
+                    dropHtml += '<span>' + child.title + '</span></a>';
+                  } else if (child.children) {
+                    // Sub-carpeta: mostrar como título de sección
+                    dropHtml += '<div class="bm-dropdown-sep">' + child.title + '</div>';
                   }
                 }
-                dropdown.innerHTML = dropHtml;
+                dropdown.innerHTML = dropHtml || '<div style="padding:8px 14px;color:var(--text3);font-size:11px">Carpeta vacía</div>';
               }
             }
+            
+            // Posicionar el dropdown usando coordenadas fijas (evita el clipping del overflow)
+            var rect = folder.getBoundingClientRect();
+            dropdown.style.top  = (rect.bottom + 4) + 'px';
+            dropdown.style.left = rect.left + 'px';
+            
+            // Ajustar si se sale por la derecha de la ventana
             dropdown.classList.add('show');
-            console.log('[Bookmarks] Dropdown should be visible now');
+            var ddRect = dropdown.getBoundingClientRect();
+            if (ddRect.right > window.innerWidth - 8) {
+              dropdown.style.left = (window.innerWidth - ddRect.width - 8) + 'px';
+            }
+            // Ajustar si se sale por abajo de la ventana
+            ddRect = dropdown.getBoundingClientRect();
+            if (ddRect.bottom > window.innerHeight - 8) {
+              // Mostrarlo hacia arriba del botón
+              dropdown.style.top = (rect.top - ddRect.height - 4) + 'px';
+            }
           }
         };
       })(folders[f]);
@@ -731,8 +746,8 @@ function loadBookmarks() {
     
     // Close dropdowns when clicking outside
     document.addEventListener('click', function(e) {
-      if (!e.target.closest('.bm-folder-wrapper')) {
-        container.querySelectorAll('.bm-dropdown.show').forEach(function(d) {
+      if (!e.target.closest('.bm-folder-wrapper') && !e.target.closest('.bm-dropdown')) {
+        document.querySelectorAll('.bm-dropdown.show').forEach(function(d) {
           d.classList.remove('show');
         });
       }
@@ -748,3 +763,30 @@ if (document.readyState === 'loading') {
 } else {
   loadBookmarks();
 }
+
+/* ═══════════════════════════════════════════
+   LIQUID GLASS — Animación de turbulencia
+   Solo anima baseFrequency — la estructura del filtro (erode/rim)
+   permanece estática. Efecto: vidrio vivo, respirando lentamente.
+═══════════════════════════════════════════ */
+(function() {
+  var turb   = document.getElementById('lg-turb');
+  var turbSm = document.getElementById('lg-turb-sm');
+  if (!turb && !turbSm) return;
+  var t = 0;
+  function animLiquid() {
+    t += 0.0018; // muy lento — como vidrio real moviéndose con calor
+    if (turb) {
+      var f1 = (0.016 + Math.sin(t * 0.50) * 0.0015).toFixed(5);
+      var f2 = (0.012 + Math.cos(t * 0.38) * 0.0012).toFixed(5);
+      turb.setAttribute('baseFrequency', f1 + ' ' + f2);
+    }
+    if (turbSm) {
+      var s1 = (0.018 + Math.sin(t * 0.60 + 1.0) * 0.0014).toFixed(5);
+      var s2 = (0.014 + Math.cos(t * 0.70 + 2.0) * 0.0012).toFixed(5);
+      turbSm.setAttribute('baseFrequency', s1 + ' ' + s2);
+    }
+    requestAnimationFrame(animLiquid);
+  }
+  animLiquid();
+})();

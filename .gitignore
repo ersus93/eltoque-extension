@@ -58,6 +58,9 @@ Thumbs.db
 .env.staging
 .env.production
 
+# Documentación del proyecto
+AGENTS.md
+
 docs/
 docs/*
 *.docs/

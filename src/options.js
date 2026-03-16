@@ -17,9 +17,23 @@ const CURRENCY_META = {
   GBP:  { label: 'Libra Esterlina',         flag: '🇬🇧' },
 };
 
+const VALIDATION_RULES = {
+  updateInterval:     { min: 1,   max: 1440,  default: 15,  field: 'updateInterval' },
+  scrollSpeed:        { min: 10,  max: 500,   default: 100, field: 'scrollSpeed' },
+  fontSize:           { min: 8,   max: 32,    default: 14,  field: 'fontSize' },
+  opacity:            { min: 0.1, max: 1,     default: 1,   field: 'opacity', isFloat: true },
+  overlayHeight:      { min: 10,  max: 100,   default: 28,  field: 'overlayHeight' },
+  overlayOpacity:     { min: 0.1, max: 1,     default: 0.95, field: 'overlayOpacity', isFloat: true },
+  overlayZIndex:      { min: 0,   max: 2147483647, default: 999999, field: 'overlayZIndex' },
+  iconRotateInterval: { min: 1,   max: 3600,  default: 2,   field: 'iconRotateInterval' },
+  notifyThreshold:    { min: 0.1, max: 100,   default: 5,   field: 'notifyThreshold', isFloat: true },
+};
+
 let settings = {};
 let currentRates = {};
 let defaults = {};
+
+let segmentedListenersAttached = new Set();
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadAll();
@@ -43,13 +57,19 @@ async function loadAll() {
 
 // ── Navigation ────────────────────────────────
 function initNav() {
-  document.querySelectorAll('.nav-item').forEach(item => {
+  const navItems = document.querySelectorAll('.nav-item');
+  const sections = document.querySelectorAll('.section');
+  
+  navItems.forEach(item => {
     item.addEventListener('click', (e) => {
       e.preventDefault();
-      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      navItems.forEach(i => i.classList.remove('active'));
+      sections.forEach(s => s.classList.remove('active'));
       item.classList.add('active');
-      document.getElementById(`section-${item.dataset.section}`)?.classList.add('active');
+      const targetSection = document.getElementById(`section-${item.dataset.section}`);
+      if (targetSection) {
+        targetSection.classList.add('active');
+      }
     });
   });
 }
@@ -115,6 +135,8 @@ function updateServerUrlVisibility() {
   const autoServerUrlGroup = document.getElementById('autoServerUrlGroup');
   const hint = document.getElementById('dataSourceHint');
   
+  if (!serverUrlGroup || !autoServerUrlGroup || !hint) return;
+  
   if (mode === 'server') {
     serverUrlGroup.style.display = 'block';
     autoServerUrlGroup.style.display = 'none';
@@ -134,9 +156,12 @@ function initDataSourceButtons() {
   const group = document.getElementById('dataSourceGroup');
   if (!group) return;
   
-  group.querySelectorAll('.seg-btn').forEach(btn => {
+  const buttons = group.querySelectorAll('.seg-btn');
+  if (!buttons || buttons.length === 0) return;
+  
+  buttons.forEach(btn => {
     btn.addEventListener('click', () => {
-      group.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+      buttons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       updateServerUrlVisibility();
     });
@@ -145,7 +170,9 @@ function initDataSourceButtons() {
 
 // ── Currencies list ───────────────────────────
 function renderCurrencies() {
-  const list     = document.getElementById('currenciesList');
+  const list = document.getElementById('currenciesList');
+  if (!list) return;
+  
   const order    = settings.currencyOrder ?? PREFERRED_ORDER;
   const selected = settings.selectedCurrencies ?? [];
 
@@ -199,15 +226,21 @@ function fmtVal(v) {
 
 // ── Drag & Drop ───────────────────────────────
 function initDragDrop() {
-  let dragging = null;
   const list = document.getElementById('currenciesList');
+  if (!list) return;
+  
+  let dragging = null;
 
   list.addEventListener('dragstart', e => {
     dragging = e.target.closest('.currency-row');
-    setTimeout(() => dragging?.classList.add('dragging'), 0);
+    if (dragging) {
+      setTimeout(() => dragging.classList.add('dragging'), 0);
+    }
   });
   list.addEventListener('dragend', () => {
-    dragging?.classList.remove('dragging');
+    if (dragging) {
+      dragging.classList.remove('dragging');
+    }
     dragging = null;
     updateOrderFromDOM();
   });
@@ -215,58 +248,94 @@ function initDragDrop() {
     e.preventDefault();
     const target = e.target.closest('.currency-row');
     if (!target || target === dragging) return;
-    const after = e.clientY > target.getBoundingClientRect().top + target.getBoundingClientRect().height / 2;
+    const rect = target.getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
     after ? target.after(dragging) : target.before(dragging);
   });
 }
 
 function updateOrderFromDOM() {
-  settings.currencyOrder = [...document.querySelectorAll('.currency-row')]
-    .map(r => r.dataset.currency);
+  const rows = document.querySelectorAll('.currency-row');
+  settings.currencyOrder = [...rows].map(r => r.dataset.currency);
 }
 
 // ── Buttons ───────────────────────────────────
 function initButtons() {
-  document.getElementById('btnSave').addEventListener('click', saveSettings);
+  const btnSave = document.getElementById('btnSave');
+  if (btnSave) btnSave.addEventListener('click', saveSettings);
 
-  document.getElementById('btnReset').addEventListener('click', async () => {
-    if (!confirm('¿Restaurar todos los valores por defecto?')) return;
-    settings = { ...defaults };
-    await chrome.runtime.sendMessage({ type: 'RESET_SETTINGS' });
-    initFields();
-    initIconRotateSection();
-    renderCurrencies();
-    showToast('Configuración restaurada');
-  });
+  const btnReset = document.getElementById('btnReset');
+  if (btnReset) {
+    btnReset.addEventListener('click', async () => {
+      if (!confirm('¿Restaurar todos los valores por defecto?')) return;
+      settings = { ...defaults };
+      await chrome.runtime.sendMessage({ type: 'RESET_SETTINGS' });
+      initFields();
+      initIconRotateSection();
+      renderCurrencies();
+      showToast('Configuración restaurada');
+    });
+  }
 
-  document.getElementById('btnTestApi').addEventListener('click', testApi);
+  const btnTestApi = document.getElementById('btnTestApi');
+  if (btnTestApi) btnTestApi.addEventListener('click', testApi);
 
-  document.getElementById('btnSelectAll').addEventListener('click', () =>
-    document.querySelectorAll('[data-cur]').forEach(c => c.checked = true));
-  document.getElementById('btnSelectNone').addEventListener('click', () =>
-    document.querySelectorAll('[data-cur]').forEach(c => c.checked = false));
+  const btnSelectAll = document.getElementById('btnSelectAll');
+  if (btnSelectAll) {
+    btnSelectAll.addEventListener('click', () =>
+      document.querySelectorAll('[data-cur]').forEach(c => c.checked = true));
+  }
+  
+  const btnSelectNone = document.getElementById('btnSelectNone');
+  if (btnSelectNone) {
+    btnSelectNone.addEventListener('click', () =>
+      document.querySelectorAll('[data-cur]').forEach(c => c.checked = false));
+  }
 
-  document.getElementById('neutralAuto').addEventListener('change', e => {
-    document.getElementById('colorNeutral').disabled    = e.target.checked;
-    document.getElementById('colorNeutralHex').disabled = e.target.checked;
-    updateColorPreview();
-  });
-
-  ['colorUp', 'colorDown', 'colorNeutral'].forEach(id => {
-    document.getElementById(id).addEventListener('input', () => {
-      syncColorHex(id, id + 'Hex');
+  const neutralAutoEl = document.getElementById('neutralAuto');
+  if (neutralAutoEl) {
+    neutralAutoEl.addEventListener('change', e => {
+      const colorNeutral = document.getElementById('colorNeutral');
+      const colorNeutralHex = document.getElementById('colorNeutralHex');
+      if (colorNeutral) colorNeutral.disabled = e.target.checked;
+      if (colorNeutralHex) colorNeutralHex.disabled = e.target.checked;
       updateColorPreview();
     });
-    document.getElementById(id + 'Hex').addEventListener('input', e => {
-      if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) {
-        document.getElementById(id).value = e.target.value;
+  }
+
+  ['colorUp', 'colorDown', 'colorNeutral'].forEach(id => {
+    const colorInput = document.getElementById(id);
+    const hexInput = document.getElementById(id + 'Hex');
+    
+    if (colorInput) {
+      colorInput.addEventListener('input', () => {
+        syncColorHex(id, id + 'Hex');
         updateColorPreview();
-      }
-    });
+      });
+    }
+    
+    if (hexInput) {
+      hexInput.addEventListener('input', e => {
+        if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) {
+          const colorInput = document.getElementById(id);
+          if (colorInput) {
+            colorInput.value = e.target.value;
+            updateColorPreview();
+          }
+        }
+      });
+    }
   });
 }
 
 async function saveSettings() {
+  const validationErrors = validateSettings();
+  
+  if (validationErrors.length > 0) {
+    showToast(`Error: ${validationErrors[0]}`);
+    return;
+  }
+  
   collectSettings();
   await chrome.storage.local.set({ settings });
   await chrome.runtime.sendMessage({ type: 'UPDATE_INTERVAL' });
@@ -283,6 +352,38 @@ async function saveSettings() {
   showToast('Configuración guardada');
 }
 
+function validateSettings() {
+  const errors = [];
+  
+  for (const [key, rule] of Object.entries(VALIDATION_RULES)) {
+    const el = document.getElementById(rule.field);
+    if (!el) continue;
+    
+    let value = rule.isFloat ? parseFloat(el.value) : parseInt(el.value, 10);
+    
+    if (isNaN(value)) {
+      errors.push(`${rule.field}: valor inválido, usando valor por defecto`);
+      value = rule.default;
+      el.value = value;
+      continue;
+    }
+    
+    if (value < rule.min || value > rule.max) {
+      errors.push(`${rule.field}: debe estar entre ${rule.min} y ${rule.max}`);
+    }
+  }
+  
+  const dataSource = getSegmented('dataSourceGroup');
+  if (dataSource === 'server') {
+    const serverUrl = getVal('serverUrl');
+    if (!serverUrl || serverUrl.trim() === '') {
+      errors.push('URL del servidor es requerida cuando el modo es "server"');
+    }
+  }
+  
+  return errors;
+}
+
 function collectSettings() {
   settings.apiUrl         = getVal('apiUrl');
   settings.apiKey         = getVal('apiKey');
@@ -290,11 +391,11 @@ function collectSettings() {
   settings.serverUrl      = getVal('serverUrl');
   settings.autoServerUrl  = getVal('autoServerUrl');
   settings.showChangeType = getSegmented('showChangeTypeGroup');
-  settings.updateInterval = getNum('updateInterval');
+  settings.updateInterval = getNum('updateInterval', VALIDATION_RULES.updateInterval);
 
   settings.scrollDirection  = getSegmented('scrollDirectionGroup');
-  settings.scrollSpeed      = getNum('scrollSpeed');
-  settings.fontSize         = getNum('fontSize');
+  settings.scrollSpeed      = getNum('scrollSpeed', VALIDATION_RULES.scrollSpeed);
+  settings.fontSize         = getNum('fontSize', VALIDATION_RULES.fontSize);
   settings.showTimestamp    = getCheck('showTimestamp');
   settings.showCurrencyFlag = getCheck('showCurrencyFlag');
   settings.compactMode      = getCheck('compactMode');
@@ -303,10 +404,12 @@ function collectSettings() {
   settings.colorDown    = getVal('colorDown');
   settings.colorNeutral = getCheck('neutralAuto') ? 'auto' : getVal('colorNeutral');
   settings.colorBg      = getSegmented('themeGroup');
-  settings.opacity      = parseFloat(document.getElementById('opacity').value);
+  
+  const opacityEl = document.getElementById('opacity');
+  settings.opacity      = opacityEl ? parseFloat(opacityEl.value) || 1 : 1;
 
   settings.iconRotateEnabled  = getCheck('iconRotateEnabled');
-  settings.iconRotateInterval = getNum('iconRotateInterval');
+  settings.iconRotateInterval = getNum('iconRotateInterval', VALIDATION_RULES.iconRotateInterval);
 
   const checks = document.querySelectorAll('[data-cur]');
   settings.selectedCurrencies = [...checks].filter(c => c.checked).map(c => c.dataset.cur);
@@ -314,25 +417,31 @@ function collectSettings() {
 
   settings.overlayEnabled  = getCheck('overlayEnabled');
   settings.overlayPosition = getSegmented('overlayPositionGroup');
-  settings.overlayHeight   = getNum('overlayHeight');
-  settings.overlayOpacity  = parseFloat(document.getElementById('overlayOpacity').value);
-  settings.overlayZIndex   = getNum('overlayZIndex');
+  settings.overlayHeight   = getNum('overlayHeight', VALIDATION_RULES.overlayHeight);
+  
+  const overlayOpacityEl = document.getElementById('overlayOpacity');
+  settings.overlayOpacity  = overlayOpacityEl ? parseFloat(overlayOpacityEl.value) || 0.95 : 0.95;
+  
+  settings.overlayZIndex   = getNum('overlayZIndex', VALIDATION_RULES.overlayZIndex);
 
   settings.newTabEnabled     = getCheck('newTabEnabled');
   settings.badgeEnabled      = getCheck('badgeEnabled');
   settings.badgeCurrency     = getVal('badgeCurrency');
   settings.notifyOnChange    = getCheck('notifyOnChange');
-  settings.notifyThreshold   = getNum('notifyThreshold');
+  settings.notifyThreshold   = getNum('notifyThreshold', VALIDATION_RULES.notifyThreshold);
 }
 
 // ── Test rotation button ──────────────────────
 function initTestRotation() {
   const btn = document.getElementById('btnTestRotation');
   if (!btn) return;
+  
+  if (btn.hasAttribute('data-listener-attached')) return;
+  btn.setAttribute('data-listener-attached', 'true');
+  
   btn.addEventListener('click', async () => {
     btn.textContent = '⏳ Reiniciando...';
     btn.disabled = true;
-    // Save current settings first so interval is applied
     collectSettings();
     await chrome.storage.local.set({ settings });
     await chrome.runtime.sendMessage({ type: 'UPDATE_INTERVAL' });
@@ -347,6 +456,12 @@ function initTestRotation() {
 async function testApi() {
   const dot  = document.querySelector('.status-dot');
   const text = document.querySelector('.status-text');
+  
+  if (!dot || !text) {
+    showToast('Elementos de estado no encontrados');
+    return;
+  }
+  
   dot.className = 'status-dot loading';
   text.textContent = 'Probando...';
   try {
@@ -381,18 +496,39 @@ function normalizeForDisplay(raw) {
 
 // ── Preview ───────────────────────────────────
 function updateColorPreview() {
-  const up  = document.getElementById('colorUp').value;
-  const dn  = document.getElementById('colorDown').value;
-  const neu = getCheck('neutralAuto') ? '#7070a0' : document.getElementById('colorNeutral').value;
-  document.querySelector('.preview-item.up').style.color      = up;
-  document.querySelector('.preview-item.down').style.color    = dn;
-  document.querySelector('.preview-item.neutral').style.color = neu;
+  const up  = document.getElementById('colorUp');
+  const dn  = document.getElementById('colorDown');
+  const neu = document.getElementById('colorNeutral');
+  
+  if (!up || !dn || !neu) return;
+  
+  const upVal = up.value;
+  const dnVal = dn.value;
+  const neuVal = getCheck('neutralAuto') ? '#7070a0' : neu.value;
+  
+  const previewUp = document.querySelector('.preview-item.up');
+  const previewDown = document.querySelector('.preview-item.down');
+  const previewNeutral = document.querySelector('.preview-item.neutral');
+  
+  if (previewUp) previewUp.style.color = upVal;
+  if (previewDown) previewDown.style.color = dnVal;
+  if (previewNeutral) previewNeutral.style.color = neuVal;
 }
 
 // ── Helpers ───────────────────────────────────
 function setVal(id, v)   { const e = document.getElementById(id); if (e && v != null) e.value = v; }
 function getVal(id)      { return document.getElementById(id)?.value ?? ''; }
-function getNum(id)      { return parseFloat(document.getElementById(id)?.value) || 0; }
+function getNum(id, rule) {
+  const el = document.getElementById(id);
+  if (!el) return rule?.default ?? 0;
+  const val = parseFloat(el.value);
+  if (isNaN(val)) return rule?.default ?? 0;
+  if (rule) {
+    const clamped = Math.max(rule.min, Math.min(rule.max, val));
+    return clamped;
+  }
+  return val;
+}
 function setCheck(id, v) { const e = document.getElementById(id); if (e) e.checked = !!v; }
 function getCheck(id)    { return !!document.getElementById(id)?.checked; }
 
@@ -402,6 +538,10 @@ function setRange(id, val, fmt) {
   if (!el || val == null) return;
   el.value = val;
   if (label && fmt) label.textContent = fmt(val);
+  
+  if (el.hasAttribute('data-listener-attached')) return;
+  el.setAttribute('data-listener-attached', 'true');
+  
   el.addEventListener('input', () => {
     if (label && fmt) label.textContent = fmt(parseFloat(el.value));
   });
@@ -410,12 +550,19 @@ function setRange(id, val, fmt) {
 function setSegmented(groupId, val) {
   const g = document.getElementById(groupId);
   if (!g) return;
-  g.querySelectorAll('.seg-btn').forEach(btn => {
+  
+  const buttons = g.querySelectorAll('.seg-btn');
+  buttons.forEach(btn => {
     btn.classList.toggle('active', btn.dataset.val === val);
-    btn.addEventListener('click', () => {
-      g.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    });
+    
+    if (!segmentedListenersAttached.has(`${groupId}-${btn.dataset.val}`)) {
+      segmentedListenersAttached.add(`${groupId}-${btn.dataset.val}`);
+      
+      btn.addEventListener('click', () => {
+        g.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    }
   });
 }
 
@@ -436,7 +583,11 @@ function syncColorHex(pickId, hexId) {
 
 function showToast(msg) {
   const t = document.getElementById('toast');
-  t.childNodes[t.childNodes.length - 1].textContent = ' ' + msg;
+  if (!t) return;
+  const lastNode = t.childNodes[t.childNodes.length - 1];
+  if (lastNode) {
+    lastNode.textContent = ' ' + msg;
+  }
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2500);
 }

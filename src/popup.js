@@ -21,12 +21,25 @@ let currentRates  = {};
 let rateChanges   = {};
 let previousRates = {};
 let tickerOpen = false;
+let listenersAttached = false;
+
+// ── Debounce utility ───────────────────────────
+function debounce(fn, delay) {
+  let timer = null;
+  return (...args) => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
 
 // ── Init ──────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  if (listenersAttached) return;
+  listenersAttached = true;
+
   // Leer preferencia de ticker abierto/cerrado
   const uiState = await chrome.storage.local.get('popupUiState');
-  tickerOpen = uiState?.popupUiState?.tickerOpen ?? false;
+  tickerOpen = (uiState.popupUiState && uiState.popupUiState.tickerOpen) ?? false;
 
   await loadData();
   applyTheme();
@@ -45,36 +58,46 @@ async function loadData() {
   previousRates = data.previousRates ?? {};
   rateChanges   = data.rateChanges   ?? {};
 
+  const errorBanner = document.getElementById('errorBanner');
+  const errorMsg = document.getElementById('errorMsg');
+
   if (data.fetchError) {
     setDot('error');
-    document.getElementById('errorBanner').style.display = 'flex';
-    document.getElementById('errorMsg').textContent = data.fetchError;
+    if (errorBanner) errorBanner.style.display = 'flex';
+    if (errorMsg) errorMsg.textContent = data.fetchError;
   } else if (Object.keys(currentRates).length > 0) {
     setDot('ok');
-    document.getElementById('errorBanner').style.display = 'none';
+    if (errorBanner) errorBanner.style.display = 'none';
   } else {
     setDot('loading');
   }
 
-  if (data.lastUpdated) {
-    document.getElementById('updateInfo').textContent = fmtTime(data.lastUpdated);
+  const updateInfo = document.getElementById('updateInfo');
+  if (data.lastUpdated && updateInfo) {
+    updateInfo.textContent = fmtTime(data.lastUpdated);
   }
 
   const iv = settings.updateInterval ?? 30;
-  document.getElementById('footerInterval').textContent =
-    `cada ${iv < 60 ? iv + ' min' : (iv / 60).toFixed(1) + ' h'}`;
+  const footerInterval = document.getElementById('footerInterval');
+  if (footerInterval) {
+    footerInterval.textContent =
+      `cada ${iv < 60 ? iv + ' min' : (iv / 60).toFixed(1) + ' h'}`;
+  }
 }
 
 function setDot(state) {
   const dot = document.getElementById('updateDot');
-  dot.className = 'update-dot ' + state;
+  if (dot) dot.className = 'update-dot ' + state;
 }
 
 // ── Render principal ──────────────────────────
 function renderAll() {
   const hasRates = Object.keys(currentRates).length > 0;
-  document.getElementById('ratesLoading').style.display = hasRates ? 'none' : 'flex';
-  document.getElementById('ratesGrid').style.display    = hasRates ? 'grid' : 'none';
+  const ratesLoading = document.getElementById('ratesLoading');
+  const ratesGrid = document.getElementById('ratesGrid');
+  
+  if (ratesLoading) ratesLoading.style.display = hasRates ? 'none' : 'flex';
+  if (ratesGrid) ratesGrid.style.display = hasRates ? 'grid' : 'none';
 
   if (hasRates) {
     renderGrid();
@@ -105,6 +128,8 @@ function getSortedCurrencies() {
 // ── Grid de tarjetas ──────────────────────────
 function renderGrid() {
   const grid = document.getElementById('ratesGrid');
+  if (!grid) return;
+  
   const currencies = getSortedCurrencies();
   const showFlags = settings.showCurrencyFlag !== false;
   const fontSize  = settings.fontSize ?? 13;
@@ -177,8 +202,8 @@ function renderTicker() {
 function applyTickerState() {
   const body    = document.getElementById('tickerBody');
   const chevron = document.getElementById('tickerChevron');
-  body.classList.toggle('open', tickerOpen);
-  chevron.classList.toggle('open', tickerOpen);
+  if (body) body.classList.toggle('open', tickerOpen);
+  if (chevron) chevron.classList.toggle('open', tickerOpen);
 }
 
 // ── Utilidades ────────────────────────────────
@@ -210,34 +235,49 @@ function applyColors() {
 
 // ── Listeners ─────────────────────────────────
 function attachListeners() {
+  const btnRefresh = document.getElementById('btnRefresh');
+  const btnSettings = document.getElementById('btnSettings');
+  const tickerToggle = document.getElementById('tickerToggle');
+
   // Refresh
-  document.getElementById('btnRefresh').addEventListener('click', async () => {
-    const btn = document.getElementById('btnRefresh');
-    btn.classList.add('spinning'); btn.disabled = true;
-    setDot('loading');
-    await chrome.runtime.sendMessage({ type: 'FETCH_NOW' });
-    await loadData();
-    renderAll();
-    btn.classList.remove('spinning'); btn.disabled = false;
-  });
+  if (btnRefresh) {
+    btnRefresh.addEventListener('click', async () => {
+      btnRefresh.classList.add('spinning'); 
+      btnRefresh.disabled = true;
+      setDot('loading');
+      await chrome.runtime.sendMessage({ type: 'FETCH_NOW' });
+      await loadData();
+      renderAll();
+      btnRefresh.classList.remove('spinning'); 
+      btnRefresh.disabled = false;
+    });
+  }
 
   // Settings
-  document.getElementById('btnSettings').addEventListener('click', () => {
-    chrome.runtime.openOptionsPage();
-  });
+  if (btnSettings) {
+    btnSettings.addEventListener('click', () => {
+      chrome.runtime.openOptionsPage();
+    });
+  }
 
   // Toggle ticker
-  document.getElementById('tickerToggle').addEventListener('click', () => {
-    tickerOpen = !tickerOpen;
-    applyTickerState();
-    chrome.storage.local.set({ popupUiState: { tickerOpen } });
-  });
+  if (tickerToggle) {
+    tickerToggle.addEventListener('click', () => {
+      tickerOpen = !tickerOpen;
+      applyTickerState();
+      chrome.storage.local.set({ popupUiState: { tickerOpen } });
+    });
+  }
 }
 
-// Actualizaciones en tiempo real
-chrome.storage.onChanged.addListener(async (changes) => {
+// Actualizaciones en tiempo real (debounced)
+const debouncedStorageUpdate = debounce(async (changes) => {
   if (changes.currentRates || changes.rateChanges || changes.lastUpdated || changes.fetchError) {
     await loadData();
     renderAll();
   }
+}, 100);
+
+chrome.storage.onChanged.addListener((changes) => {
+  debouncedStorageUpdate(changes);
 });
